@@ -22,9 +22,9 @@ patches:
 images:
   - name: demo-backend
     newName: ghcr.io/resumepilot360/demo-backend
-    digest: sha256:3135a1bedbc6b2475ae8d5e716c5a772b448bd27fc863ba5ca01db76e62d7dbc
+    digest: sha256:111dd3d1967e83ca73be9618ac0f259b36e89ccca8e5e0b340a80004518fcb5a
   - name: demo-frontend
     newName: ghcr.io/resumepilot360/demo-frontend
-    digest: sha256:693cdf769a886134151b26d52016b0e95e4637f634c9b88f713f76675a14156e
+    digest: sha256:d1b108a84f56507e4a38c304f661b1e7ddbb2a404ce757415da585b316715a23
 components:
   - ../../components/smoke-hook
