@@ -1,0 +1,55 @@
+# Argo CD Helm values (chart version pinned in local/versions.env).
+# Installed by scripts/cluster-up.sh (bootstrap layer); Argo CD then manages
+# everything under gitops/applications from Git.
+global:
+  domain: argocd.lab.localhost
+dex:
+  enabled: false                 # no IdP locally; see docs/decisions/0009 (SSO gap)
+notifications:
+  enabled: false
+configs:
+  params:
+    server.insecure: true        # TLS terminates at Traefik in Phase 6; loopback-only until then
+  cm:
+    admin.enabled: true
+    exec.enabled: false          # no web terminal into pods
+    timeout.reconciliation: 60s  # faster drift detection in the lab (default 120s)
+    # CiliumIdentity objects are created by Cilium at runtime; tracking them is noise.
+    # (Secret values are masked in Argo CD diffs by default.)
+    resource.exclusions: |
+      - apiGroups: ["cilium.io"]
+        kinds: ["CiliumIdentity"]
+        clusters: ["*"]
+  rbac:
+    # Group names match the Kubernetes RBAC personas; they take effect once SSO
+    # supplies groups. Until then only the local admin account exists.
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:developer, applications, get,  demo/*,        allow
+      p, role:developer, applications, sync, demo/demo-dev, allow
+      g, lab:developers,      role:developer
+      g, lab:auditors,        role:readonly
+      g, lab:platform-admins, role:admin
+server:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 256Mi}
+controller:
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 768Mi}
+repoServer:
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 512Mi}
+applicationSet:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
+redis:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}

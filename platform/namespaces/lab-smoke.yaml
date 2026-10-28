@@ -1,6 +1,9 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  annotations:
+    # Removing the namespace from Git must never cascade-delete its contents.
+    argocd.argoproj.io/sync-options: Delete=false
   name: lab-smoke
   labels:
     lab.platform/environment: test

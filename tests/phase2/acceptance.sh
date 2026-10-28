@@ -6,8 +6,9 @@ source "$(dirname "$0")/../../scripts/lib.sh"
 ID="$LAB_ROOT/.tools/identities"
 API="https://127.0.0.1:$API_PORT"
 
-echo "== Setup: apply RBAC and issue persona certificates (24h)"
-kc apply -k "$LAB_ROOT/platform/rbac" >/dev/null
+echo "== Setup: RBAC is owned by Argo CD; issue persona certificates (24h)"
+check "Argo CD app platform-rbac Synced and Healthy" bash -c \
+  "[[ \$(kubectl --context $KUBE_CONTEXT -n argocd get application platform-rbac -o jsonpath='{.status.sync.status}/{.status.health.status}') == Synced/Healthy ]]"
 for p in "alice lab:platform-admins" "dana lab:developers" "riley lab:auditors"; do
   # shellcheck disable=SC2086
   "$LAB_ROOT/scripts/issue-user-cert.sh" $p >/dev/null

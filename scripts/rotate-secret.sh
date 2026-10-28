@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rotate one generated field of demo/backend in an environment's KV mount.
 #
-#   scripts/rotate-secret.sh <dev|staging> [field]   (default field: db_password)
+#   scripts/rotate-secret.sh <dev|staging|prod> [field]   (default field: db_password)
 #
 # Writes a new KV version with the operator token (never root). ESO picks it up
 # within the ExternalSecret refreshInterval (1m). Pods reading the Secret as env
@@ -9,8 +9,8 @@
 # The previous version stays in KV history for rollback: see docs/runbooks/secrets.md.
 source "$(dirname "$0")/lib.sh"
 
-env="${1:?dev|staging}"; field="${2:-db_password}"
-[[ "$env" =~ ^(dev|staging)$ ]] || die "env must be dev or staging"
+env="${1:?environment (one of: $ENVIRONMENTS)}"; field="${2:-db_password}"
+[[ " $ENVIRONMENTS " == *" $env "* ]] || die "env must be one of: $ENVIRONMENTS"
 TOKEN="$(cat "$LAB_ROOT/.tools/secrets/openbao-operator.token")" || die "No operator token; run scripts/openbao-bootstrap.sh"
 PORT=18201; ADDR="http://127.0.0.1:$PORT"
 kc -n openbao port-forward pod/openbao-0 "$PORT:8200" >/dev/null 2>&1 & pf=$!

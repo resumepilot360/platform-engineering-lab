@@ -1,0 +1,62 @@
+# Demo application, one Application per environment.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-dev
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "1"}
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: demo
+  source:
+    repoURL: https://github.com/resumepilot360/platform-engineering-lab.git
+    targetRevision: main
+    path: gitops/environments/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-dev
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-staging
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "1"}
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: demo
+  source:
+    repoURL: https://github.com/resumepilot360/platform-engineering-lab.git
+    targetRevision: main
+    path: gitops/environments/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-staging
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-prod
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "1"}
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: demo
+  source:
+    repoURL: https://github.com/resumepilot360/platform-engineering-lab.git
+    targetRevision: main
+    path: gitops/environments/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-prod
+  syncPolicy:
+    # Manual sync: prod changes need a merged, approved promotion PR AND a
+    # human sync in Argo CD (second gate).
+    syncOptions: [ServerSideApply=true]

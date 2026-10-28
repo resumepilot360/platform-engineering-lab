@@ -1,0 +1,34 @@
+# Static validation of every Kustomize build in the repo (same checks as
+# scripts/validate.sh, minus the k3d config check that needs k3d).
+name: validate
+on:
+  push:
+    branches: [main]
+    paths: ["gitops/**", "platform/**", "applications/*/deploy/**", "tests/**", ".github/workflows/validate.yaml"]
+  pull_request:
+    paths: ["gitops/**", "platform/**", "applications/*/deploy/**", "tests/**", ".github/workflows/validate.yaml"]
+permissions:
+  contents: read
+jobs:
+  kubeconform:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+      - run: go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0
+      - name: Build and validate every kustomization
+        run: |
+          rc=0
+          for k in $(git ls-files '*kustomization.yaml'); do
+            d=$(dirname "$k"); echo "::group::$d"
+            kubectl kustomize "$d" | ~/go/bin/kubeconform -strict -summary -kubernetes-version 1.35.0 \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' - || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc

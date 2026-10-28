@@ -65,7 +65,7 @@ TOKEN="$(jq -r .root_token "$INIT")"
 # The audit device is declared in the server config (values.yaml); verify it is active.
 api GET sys/audit | jq -e '.data["stdout/"]' >/dev/null || die "Audit device stdout/ not active — check the audit stanza in platform/secrets/openbao/values.yaml"
 
-for env in dev staging; do
+for env in $ENVIRONMENTS; do
   api GET sys/mounts | jq -e --arg m "kv-$env/" '.data[$m]' >/dev/null || {
     log "Enabling KV v2 mount kv-$env/"
     api POST "sys/mounts/kv-$env" '{"type":"kv","options":{"version":"2"}}' >/dev/null; }
@@ -94,7 +94,7 @@ log "Roles:    $(api LIST auth/kubernetes/role | jq -r '.data.keys | join(",")')
 
 # --- seed (only if absent; values are generated, never stored in Git) --------
 TOKEN="$(cat "$OPTOKEN")"
-for env in dev staging; do
+for env in $ENVIRONMENTS; do
   if ! api GET "kv-$env/data/demo/backend" >/dev/null 2>&1; then
     log "Seeding kv-$env/demo/backend with generated values"
     body=$(jq -n --arg u "demo_$env" --arg p "$(openssl rand -base64 24)" --arg k "$(openssl rand -hex 16)" \

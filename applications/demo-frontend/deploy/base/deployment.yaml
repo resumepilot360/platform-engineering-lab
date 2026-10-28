@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-frontend
+  labels: &labels
+    app.kubernetes.io/name: demo-frontend
+    app.kubernetes.io/part-of: demo
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app.kubernetes.io/name: demo-frontend}
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {app.kubernetes.io/name: demo-frontend}
+      containers:
+        - name: web
+          image: demo-frontend
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            - {name: BACKEND_URL, value: "http://demo-backend"}
+          readinessProbe:                       # ready only while the backend answers
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-frontend
+  labels: {app.kubernetes.io/name: demo-frontend, app.kubernetes.io/part-of: demo}
+spec:
+  selector: {app.kubernetes.io/name: demo-frontend}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-frontend
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: demo.ENV.lab.localhost            # patched per environment
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: demo-frontend, port: {name: http}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: demo-frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: demo-frontend}

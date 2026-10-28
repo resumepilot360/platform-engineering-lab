@@ -1,0 +1,30 @@
+# demo app, prod environment. Changes only via an approved promotion PR from staging,
+# then a manual Argo CD sync.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: demo-prod
+resources:
+  - ../../../applications/demo-backend/deploy/base
+  - ../../../applications/demo-frontend/deploy/base
+labels:
+  - pairs: {lab.platform/environment: prod}
+    includeSelectors: false
+    includeTemplates: true
+replicas:
+  - {name: demo-backend, count: 2}
+  - {name: demo-frontend, count: 2}
+patches:
+  - target: {kind: Ingress, name: demo-frontend}
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: demo.prod.lab.localhost
+images:
+  - name: demo-backend
+    newName: k3d-registry.localhost:5001/lab/demo-backend
+    newTag: unreleased
+  - name: demo-frontend
+    newName: k3d-registry.localhost:5001/lab/demo-frontend
+    newTag: unreleased
+components:
+  - ../../components/smoke-hook

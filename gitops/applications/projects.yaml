@@ -1,0 +1,50 @@
+# AppProjects are the GitOps blast-radius boundary.
+#   platform: cluster-scoped tenancy objects (namespaces, cluster RBAC) + platform config
+#   demo:     application workloads only, confined to demo-* namespaces; may not
+#             ship Secrets, quotas, RBAC, NetworkPolicies or secret stores
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "-10"}
+spec:
+  description: Platform-owned configuration
+  sourceRepos: ["https://github.com/resumepilot360/platform-engineering-lab.git"]
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: "*"}
+  clusterResourceWhitelist:
+    - {group: "", kind: Namespace}
+    - {group: rbac.authorization.k8s.io, kind: ClusterRole}
+    - {group: rbac.authorization.k8s.io, kind: ClusterRoleBinding}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: demo
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "-10"}
+spec:
+  description: Demo application, all environments
+  sourceRepos: ["https://github.com/resumepilot360/platform-engineering-lab.git"]
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: demo-dev}
+    - {server: https://kubernetes.default.svc, namespace: demo-staging}
+    - {server: https://kubernetes.default.svc, namespace: demo-prod}
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - {group: "", kind: Secret}
+    - {group: "", kind: ResourceQuota}
+    - {group: "", kind: LimitRange}
+    - {group: rbac.authorization.k8s.io, kind: Role}
+    - {group: rbac.authorization.k8s.io, kind: RoleBinding}
+    - {group: networking.k8s.io, kind: NetworkPolicy}
+    - {group: external-secrets.io, kind: SecretStore}
+    - {group: external-secrets.io, kind: ExternalSecret}
+  roles:
+    - name: developer
+      description: Sync dev; read everything in the project
+      policies:
+        - p, proj:demo:developer, applications, get, demo/*, allow
+        - p, proj:demo:developer, applications, sync, demo/demo-dev, allow
+      groups: [lab:developers]

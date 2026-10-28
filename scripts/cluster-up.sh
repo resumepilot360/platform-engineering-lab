@@ -42,9 +42,8 @@ cilium --context "$KUBE_CONTEXT" status --wait --wait-duration 5m >/dev/null
 log "Waiting for nodes"
 kc wait --for=condition=Ready nodes --all --timeout=180s
 
-log "Applying platform namespaces and RBAC"
-kc apply -k "$LAB_ROOT/platform/namespaces"
-kc apply -k "$LAB_ROOT/platform/rbac"
+log "Applying bootstrap namespaces"
+kc apply -k "$LAB_ROOT/local/bootstrap"
 
 log "Installing External Secrets Operator $EXTERNAL_SECRETS_CHART_VERSION and OpenBao $OPENBAO_CHART_VERSION"
 helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 || true
@@ -56,7 +55,20 @@ hc upgrade --install external-secrets external-secrets/external-secrets --versio
 hc upgrade --install openbao openbao/openbao --version "$OPENBAO_CHART_VERSION" \
   --namespace openbao -f "$LAB_ROOT/platform/secrets/openbao/values.yaml"
 "$LAB_ROOT/scripts/openbao-bootstrap.sh"
-kc apply -k "$LAB_ROOT/platform/secrets/stores"
+
+# From here on, Argo CD owns all platform config and apps (ADR-0009).
+log "Installing Argo CD $ARGOCD_CHART_VERSION"
+helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
+helm repo update argo >/dev/null
+hc upgrade --install argocd argo/argo-cd --version "$ARGOCD_CHART_VERSION" \
+  --namespace argocd -f "$LAB_ROOT/gitops/bootstrap/argocd/values.yaml" --wait --timeout 15m
+kc apply -f "$LAB_ROOT/gitops/bootstrap/root.yaml"
+log "Waiting for Argo CD to sync platform applications"
+for a in platform-namespaces platform-rbac platform-secret-stores lab-portal; do
+  until kc -n argocd get application "$a" >/dev/null 2>&1; do sleep 3; done
+  kc -n argocd wait application "$a" --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s
+  kc -n argocd wait application "$a" --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s
+done
 
 log "Waiting for core add-ons"
 for d in coredns metrics-server local-path-provisioner; do
@@ -64,9 +76,5 @@ for d in coredns metrics-server local-path-provisioner; do
 done
 until kc -n kube-system get deploy/traefik >/dev/null 2>&1; do sleep 3; done
 kc -n kube-system rollout status deploy/traefik --timeout=300s
-
-log "Applying lab portal (http://lab.localhost:$INGRESS_HTTP_PORT)"
-kc apply -k "$LAB_ROOT/platform/portal"
-kc -n lab-portal rollout status deploy/portal --timeout=120s
 
 "$LAB_ROOT/scripts/health-check.sh"

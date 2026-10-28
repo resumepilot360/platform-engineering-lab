@@ -1,0 +1,12 @@
+# Production: developers have NO access (no binding). Platform admins and
+# auditors read via their cluster-wide `view`; changes arrive only through a
+# reviewed promotion PR and a manual Argo CD sync.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: access-policy
+  namespace: demo-prod
+  labels: {lab.platform/managed-by: platform-team}
+data:
+  developers: none
+  changes: "promotion PR (production environment approval) + manual Argo CD sync"

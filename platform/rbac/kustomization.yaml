@@ -6,3 +6,4 @@ resources:
   - demo-dev.yaml
   - demo-staging.yaml
   - service-accounts.yaml
+  - demo-prod.yaml

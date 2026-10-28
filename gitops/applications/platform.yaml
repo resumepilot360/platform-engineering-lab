@@ -1,0 +1,81 @@
+# Platform configuration owned by Argo CD (ordered by sync wave).
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-namespaces
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "-3"}
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/resumepilot360/platform-engineering-lab.git
+    targetRevision: main
+    path: platform/namespaces
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-rbac
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "-2"}
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/resumepilot360/platform-engineering-lab.git
+    targetRevision: main
+    path: platform/rbac
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-secret-stores
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "-1"}
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/resumepilot360/platform-engineering-lab.git
+    targetRevision: main
+    path: platform/secrets/stores
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lab-portal
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "0"}
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/resumepilot360/platform-engineering-lab.git
+    targetRevision: main
+    path: platform/portal
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lab-portal
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]

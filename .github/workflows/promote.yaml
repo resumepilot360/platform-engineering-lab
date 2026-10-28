@@ -1,0 +1,64 @@
+# Promote the exact image digests running in one environment to the next by
+# opening a pull request. Nothing is rebuilt: what was tested is what ships.
+#   dev → staging     : PR, Argo CD auto-syncs staging after merge
+#   staging → prod    : PR gated by the `production` environment (required
+#                       reviewer), and Argo CD prod sync is manual
+name: promote
+on:
+  workflow_dispatch:
+    inputs:
+      to:
+        description: Target environment
+        type: choice
+        options: [staging, prod]
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.to == 'prod' && 'production' || 'staging' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Data flows through env vars and files, never through ${{ }} interpolation
+      # inside run: scripts (avoids workflow script injection).
+      - name: Copy image pins
+        id: copy
+        env:
+          TO: ${{ inputs.to }}
+        run: |
+          from=$([[ $TO == prod ]] && echo staging || echo dev)
+          src=gitops/environments/$from/kustomization.yaml dst=gitops/environments/$TO/kustomization.yaml
+          if yq -e '.images[] | select(has("digest") | not)' "$src" >/dev/null 2>&1; then
+            echo "::error::$from has images without a digest pin; refusing to promote tags"; exit 1
+          fi
+          yq -i ".images = load(\"$src\").images" "$dst"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+          {
+            echo "Promotes the digests currently in **$from** to **$TO**."; echo
+            yq '.images[] | "- `" + .name + "`: `" + .digest + "`"' "$dst"; echo
+            if [[ $TO == prod ]]; then echo "After merge: Argo CD shows prod OutOfSync; sync it manually."
+            else echo "After merge: Argo CD syncs $TO automatically."; fi
+            echo "Rollback: revert this PR."
+          } > "$RUNNER_TEMP/pr-body.md"
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TO: ${{ inputs.to }}
+          FROM: ${{ steps.copy.outputs.from }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          branch="promote/$TO-$RUN_ID"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add "gitops/environments/$TO/kustomization.yaml"
+          git diff --cached --quiet && { echo "$TO already matches $FROM"; exit 0; }
+          git commit -m "promote($TO): demo apps from $FROM"
+          git push -u origin "$branch"
+          gh pr create --base main --head "$branch" --title "promote($TO): demo apps from $FROM" --body-file "$RUNNER_TEMP/pr-body.md"

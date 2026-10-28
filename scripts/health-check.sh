@@ -11,6 +11,10 @@ check "Cilium healthy"        cilium --context "$KUBE_CONTEXT" status --wait --w
 for d in coredns metrics-server local-path-provisioner traefik cilium-operator hubble-relay; do
   check "kube-system/$d available" kc -n kube-system wait --for=condition=Available deploy/"$d" --timeout=30s
 done
+for d in argocd-server argocd-repo-server; do
+  check "argocd/$d available" kc -n argocd wait --for=condition=Available deploy/"$d" --timeout=30s
+done
+check "argocd application controller ready" kc -n argocd rollout status statefulset/argocd-application-controller --timeout=30s
 check "no kube-system pods outside Running/Succeeded" bash -c \
   "[[ -z \$(kubectl --context $KUBE_CONTEXT -n kube-system get pods --no-headers --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null) ]]"
 check "metrics API serving (kubectl top nodes)" kc top nodes

@@ -1,0 +1,158 @@
+# CI for the demo apps: test → SAST + dependency scan → build → image scan →
+# publish to GHCR (main only) → pin the new digests in gitops/environments/dev.
+# Argo CD (in the cluster) does the deploying; CI never holds cluster credentials.
+#
+# Actions are pinned to full commit SHAs (tag in the trailing comment).
+name: ci
+on:
+  push:
+    branches: [main]
+    paths: ["applications/**", ".github/workflows/ci.yaml"]
+  pull_request:
+    paths: ["applications/**", ".github/workflows/ci.yaml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GO_VERSION: "1.27.3"
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  test:
+    name: test (${{ matrix.app }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        app: [demo-backend, demo-frontend]
+    defaults:
+      run:
+        working-directory: applications/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false            # no third-party modules to cache
+      - name: Vet
+        run: go vet ./...
+      - name: Unit tests
+        run: go test -race -count=1 ./...
+      - name: Integration tests
+        run: go test -race -count=1 -tags integration ./...
+      - name: Dependency and stdlib vulnerability scan (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  sast:
+    name: sast (semgrep)
+    runs-on: ubuntu-24.04
+    container:
+      image: semgrep/semgrep:1.182.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Semgrep (Go, secrets, Dockerfile rules)
+        run: semgrep scan --metrics=off --error --config p/golang --config p/secrets --config p/dockerfile applications/
+
+  build:
+    name: build (${{ matrix.app }})
+    needs: [test, sast]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write             # used only on main, for the GHCR push
+    strategy:
+      matrix:
+        app: [demo-backend, demo-frontend]
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: type=sha,prefix=sha-,format=short
+          labels: |
+            org.opencontainers.image.title=${{ matrix.app }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+      - name: Build candidate (local, not pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: applications/${{ matrix.app }}
+          load: true
+          tags: ${{ env.IMAGE }}:candidate
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+      - name: Container vulnerability scan (Trivy) — fail on fixable HIGH/CRITICAL
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:candidate
+          version: v0.76.1
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish (same build, from cache)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: applications/${{ matrix.app }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+
+  deploy-dev:
+    name: pin digests in dev
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write             # commit to gitops/environments/dev
+    concurrency:
+      group: gitops-dev
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Resolve pushed digests and update the dev overlay
+        run: |
+          short="${GITHUB_SHA::7}"
+          for app in demo-backend demo-frontend; do
+            ref="$IMAGE_PREFIX/$app:sha-$short"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r .digest)
+            [[ "$digest" == sha256:* ]] || { echo "no digest for $ref"; exit 1; }
+            echo "$app -> $IMAGE_PREFIX/$app@$digest"
+            yq -i "(.images[] | select(.name == \"$app\")) = {\"name\": \"$app\", \"newName\": \"$IMAGE_PREFIX/$app\", \"digest\": \"$digest\"}" \
+              gitops/environments/dev/kustomization.yaml
+          done
+      - name: Commit (GITHUB_TOKEN pushes do not re-trigger workflows)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gitops/environments/dev/kustomization.yaml
+          git diff --cached --quiet && { echo "no change"; exit 0; }
+          git commit -m "deploy(dev): demo apps @ ${GITHUB_SHA::7}"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 5; done; exit 1

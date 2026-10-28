@@ -3,5 +3,5 @@ kind: Kustomization
 resources:
   - demo-dev.yaml
   - demo-staging.yaml
+  - demo-prod.yaml
   - lab-smoke.yaml
-  - platform-services.yaml
