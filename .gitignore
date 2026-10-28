@@ -1,0 +1,20 @@
+# Local tool binaries (fetched by scripts/install-tools.sh)
+.tools/
+# Generated kubeconfigs, credentials and secret material — never commit
+*.kubeconfig
+kubeconfig*
+*.pem
+*.key
+*.crt
+*.p12
+.env
+*.env.local
+secrets/
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+# Test output
+# reports/*.log are committed as evidence of each phase run
+.DS_Store

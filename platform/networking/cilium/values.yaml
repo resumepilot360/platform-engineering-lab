@@ -1,0 +1,40 @@
+# Cilium Helm values for k3d (chart version pinned in local/versions.env).
+# kube-proxy is kept (K3s default); Cilium provides pod networking and
+# NetworkPolicy/CiliumNetworkPolicy enforcement. See docs/decisions/0002-cilium-cni.md.
+kubeProxyReplacement: false
+ipam:
+  # Use the per-node podCIDRs K3s already allocates from 10.42.0.0/16.
+  mode: kubernetes
+routingMode: tunnel
+tunnelProtocol: vxlan
+operator:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+resources:
+  requests:
+    cpu: 50m
+    memory: 160Mi
+  limits:
+    memory: 512Mi
+cgroup:
+  autoMount:
+    enabled: true
+  hostRoot: /run/cilium/cgroupv2
+# Flow visibility for Phase 6/7; UI stays off until needed.
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+  ui:
+    enabled: false

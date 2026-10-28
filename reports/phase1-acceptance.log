@@ -1,0 +1,41 @@
+== AC1-3: nodes, system pods, API readiness
+Cluster health: k3d-platform-lab
+  PASS API /readyz (host :6550)
+  PASS API /livez
+  PASS 3 nodes Ready
+  PASS Cilium healthy
+  PASS kube-system/coredns available
+  PASS kube-system/metrics-server available
+  PASS kube-system/local-path-provisioner available
+  PASS kube-system/traefik available
+  PASS kube-system/cilium-operator available
+  PASS kube-system/hubble-relay available
+  PASS no kube-system pods outside Running/Succeeded
+  PASS metrics API serving (kubectl top nodes)
+  PASS registry reachable from host
+  PASS audit log being written
+
+14 passed, 0 failed
+  PASS health-check.sh passes
+== AC4: test applications deploy
+  PASS whoami rollout complete
+  PASS storage-probe rollout complete
+  PASS image pulled from local registry
+  PASS whoami replicas spread over >1 node (got 2)
+  PASS LimitRange/limits present on pods
+  PASS privileged pod rejected by Pod Security (restricted)
+== AC5: ingress routes traffic
+  PASS GET http://smoke.lab.localhost:8081/ returns 200 via Traefik
+  PASS response comes from a whoami pod
+  PASS unknown host returns 404
+  PASS load balanced across both replicas (saw 2)
+== AC6: persistent storage
+  PASS PVC Bound
+  PASS write to volume
+  PASS data survives pod replacement (storage-probe-84c7f9b87-zzpgh -> storage-probe-84c7f9b87-vrdrs)
+  PASS replacement pinned to same node by PV affinity (k3d-platform-lab-agent-1)
+  PASS root filesystem is read-only
+== AC7: reproducible from configuration
+  PASS static validation passes
+
+17 passed, 0 failed

@@ -1,0 +1,91 @@
+Preflight: tools
+  PASS docker daemon reachable
+  PASS k3d >= v5.9.0
+  PASS kubectl client == v1.35.10
+  PASS helm installed
+  PASS cilium-cli >= v0.20.1
+  PASS k9s installed
+  PASS jq installed
+  PASS yq installed
+  PASS kubeconform installed
+Preflight: Docker resources
+  PASS Docker CPUs >= 4 (have 6)
+  PASS Docker memory >= 8 GiB (have 15)
+  PASS host disk free >= 20 GiB (have 32)
+Preflight: host ports
+  PASS port 6550 free or owned by lab
+  PASS port 8081 free or owned by lab
+  PASS port 8443 free or owned by lab
+  PASS port 5001 free or owned by lab
+Preflight: other clusters
+
+16 passed, 0 failed
+[lab] Mirroring docker.io/traefik/whoami:v1.11.0 -> localhost:5001/lab/whoami:v1.11.0
+[lab] Mirroring docker.io/library/busybox:1.37.0 -> localhost:5001/lab/busybox:1.37.0
+[lab] Registry catalog: {"repositories":["lab/busybox","lab/whoami"]}
+[lab] Cluster platform-lab exists; starting it
+[36mINFO[0m[0000] Using the k3d-tools node to gather environment information 
+[36mINFO[0m[0000] Starting new tools node...                   
+[36mINFO[0m[0000] Starting node 'k3d-platform-lab-tools'       
+[36mINFO[0m[0001] Starting cluster 'platform-lab'              
+[36mINFO[0m[0001] All servers already running.                 
+[36mINFO[0m[0001] All agents already running.                  
+[36mINFO[0m[0001] All helpers already running.                 
+[36mINFO[0m[0001] Started cluster 'platform-lab'               
+[lab] Installing Cilium 1.20.4
+Release "cilium" has been upgraded. Happy Helming!
+NAME: cilium
+LAST DEPLOYED: Wed Oct 28 14:37:48 2026
+NAMESPACE: kube-system
+STATUS: deployed
+REVISION: 2
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+NOTES:
+You have successfully installed Cilium with Hubble Relay.
+
+WARNINGS:
+- WARNING: TLS is not enabled for the Hubble Relay server (hubble.relay.tls.server.enabled=false).
+  This means Hubble Relay communications may not be encrypted. For more information about the security
+  implications and suggested controls, please see: https://docs.cilium.io/en/stable/security/threat-model/#hubble-data-attacker
+
+Your release version is 1.20.4.
+
+For any further help, visit https://docs.cilium.io/en/v1.20/gettinghelp
+[lab] Waiting for nodes
+node/k3d-platform-lab-agent-0 condition met
+node/k3d-platform-lab-agent-1 condition met
+node/k3d-platform-lab-server-0 condition met
+[lab] Applying platform namespaces
+namespace/demo-dev created
+namespace/demo-staging created
+namespace/lab-smoke created
+resourcequota/namespace-quota created
+resourcequota/namespace-quota created
+resourcequota/namespace-quota created
+limitrange/default-limits created
+limitrange/default-limits created
+limitrange/default-limits created
+[lab] Waiting for core add-ons
+deployment "coredns" successfully rolled out
+deployment "metrics-server" successfully rolled out
+deployment "local-path-provisioner" successfully rolled out
+deployment "traefik" successfully rolled out
+Cluster health: k3d-platform-lab
+  PASS API /readyz (host :6550)
+  PASS API /livez
+  PASS 3 nodes Ready
+  PASS Cilium healthy
+  PASS kube-system/coredns available
+  PASS kube-system/metrics-server available
+  PASS kube-system/local-path-provisioner available
+  PASS kube-system/traefik available
+  PASS kube-system/cilium-operator available
+  PASS kube-system/hubble-relay available
+  PASS no kube-system pods outside Running/Succeeded
+  PASS metrics API serving (kubectl top nodes)
+  PASS registry reachable from host
+  PASS audit log being written
+
+14 passed, 0 failed
+bash scripts/cluster-up.sh  4.20s user 2.27s system 18% cpu 35.295 total

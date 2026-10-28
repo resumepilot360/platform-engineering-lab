@@ -1,0 +1,23 @@
+# Overrides for the K3s-bundled Traefik chart (processed by the K3s helm-controller).
+# servicelb is disabled, so Traefik is exposed as a NodePort and reached via the
+# k3d load balancer on 127.0.0.1:8081 (HTTP) and 127.0.0.1:8443 (HTTPS).
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    service:
+      type: NodePort
+    ports:
+      web:
+        nodePort: 30080
+      websecure:
+        nodePort: 30443
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi

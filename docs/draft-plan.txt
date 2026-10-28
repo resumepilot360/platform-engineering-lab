@@ -1,0 +1,353 @@
+Project: Enterprise Kubernetes Platform Engineering Lab
+
+Mission
+
+Build a reproducible, production-inspired Kubernetes platform engineering lab locally on my Apple Silicon Mac before implementing its AWS equivalent with Terraform.
+
+The objective is to learn and demonstrate enterprise Kubernetes architecture, DevSecOps, IAM, security controls, GitOps, observability, infrastructure automation, and incident response.
+
+This is a real implementation project, not a conceptual tutorial or a collection of disconnected manifests.
+
+Use my existing local environment where appropriate, but diagnose its current health before modifying it.
+
+Current Environment
+
+* Host: macOS on Apple Silicon.
+* Docker Desktop is installed.
+* k3d v5.9.0 is installed.
+* Kubernetes distribution: K3s v1.35.5+k3s1.
+* Existing cluster: dev-cluster.
+* Existing cluster topology: three server nodes and two agent nodes.
+* The cluster has returned Kubernetes API HTTP 503 errors.
+* Earlier server logs showed etcd Raft peer communication failures on port 2380.
+* One control-plane container restarted; the other two did not.
+* The existing kubeconfig was previously inconsistent and has been updated to the k3d-dev-cluster context.
+
+Do not assume the existing cluster is healthy.
+
+Do not delete the existing cluster, persistent volumes, etcd data, kubeconfig, or application workloads without explicit approval.
+
+First inspect the environment and provide a diagnostic report.
+
+Implementation Principles
+
+1. Work incrementally.
+2. Prefer reproducible automation over manual configuration.
+3. Store all non-secret configuration in version control.
+4. Never commit credentials, private keys, or secret values.
+5. Use pinned and documented versions where practical.
+6. Validate manifests before applying them.
+7. Test every major component after installation.
+8. Document commands, expected output, troubleshooting, and rollback procedures.
+9. Avoid duplicate ownership of resources between Terraform and Argo CD.
+10. Separate local simulation from actual AWS implementation.
+11. Do not create AWS resources until I explicitly approve the AWS phase.
+12. Explain architectural decisions and their security implications.
+
+Phase 0: Environment Discovery and Recovery Planning
+
+Inspect:
+
+* macOS architecture and available resources.
+* Docker Desktop resources and container status.
+* Existing k3d and Kind clusters.
+* Current Kubernetes contexts and kubeconfig locations.
+* k3d cluster configuration and API port mappings.
+* Existing namespaces, workloads, volumes, and container images where accessible.
+* etcd and K3s logs for all control-plane nodes.
+* Container restart counts and OOM status.
+* CPU, memory, and disk usage.
+
+Produce a diagnostic report identifying confirmed facts, likely causes, and unresolved questions.
+
+Recommend whether to recover the existing cluster or create a separate lab.
+
+Do not make destructive changes.
+
+If the existing cluster cannot be recovered safely, propose a separate cluster design and obtain my approval before creating or deleting infrastructure.
+
+Phase 1: Local Kubernetes Foundation
+
+Establish a stable local cluster.
+
+Use k3d unless a documented limitation justifies another local Kubernetes distribution.
+
+Implement:
+
+* Kubernetes cluster configuration.
+* Helm.
+* kubectl.
+* K9s.
+* Local image registry strategy.
+* Ingress controller.
+* Storage configuration.
+* Metrics Server.
+* Resource requests and limits.
+* Health probes.
+* Namespace separation.
+
+Acceptance criteria:
+
+* All intended nodes are Ready.
+* Core system pods are healthy.
+* The Kubernetes API readiness endpoint succeeds.
+* Test applications deploy successfully.
+* Ingress routes traffic correctly.
+* Persistent storage behaves as documented.
+* The environment can be reproduced from configuration.
+
+Do not continue until the foundation is stable.
+
+Phase 2: Identity and Access Management
+
+Implement and demonstrate:
+
+* Kubernetes RBAC.
+* Namespace-scoped roles.
+* Least-privilege service accounts.
+* Separate administrator, developer, and read-only permissions.
+* Restricted privileged access.
+* Authentication and authorization testing.
+* Audit logging where supported.
+
+Document the difference between:
+
+* Human identity.
+* Kubernetes identity.
+* Kubernetes service accounts.
+* GitHub Actions identity.
+* AWS IAM roles.
+* AWS EKS access entries.
+* EKS Pod Identity and IRSA.
+
+Use local OIDC integration only where practical.
+
+Do not claim that local Kubernetes RBAC reproduces AWS IAM integration.
+
+Phase 3: Secrets Management
+
+Implement:
+
+* Safe Kubernetes Secret handling.
+* External secret management using Vault or an External Secrets Operator.
+* Secret access restrictions.
+* Rotation procedures.
+* Separation between development and staging secrets.
+
+Design the AWS equivalent around Secrets Manager and KMS.
+
+Do not store real secrets in Git, image layers, Terraform source files, Terraform outputs, or CI logs.
+
+Document the limitations of local encryption and the AWS KMS implementation.
+
+Phase 4: GitOps
+
+Install Argo CD and establish a GitOps repository structure.
+
+Use GitHub Actions for CI and Argo CD for continuous delivery.
+
+The workflow must cover:
+
+1. Source changes.
+2. Unit and integration tests.
+3. Code and dependency scanning.
+4. Container image build.
+5. Container scanning.
+6. Image publication.
+7. Deployment configuration update.
+8. Argo CD reconciliation.
+9. Health verification.
+10. Rollback.
+
+Use Helm or Kustomize consistently.
+
+Demonstrate drift detection and reconciliation.
+
+Document how promotion between development, staging, and production works.
+
+Phase 5: DevSecOps and Policy Enforcement
+
+Integrate suitable tools for:
+
+* Static application security testing.
+* Dependency scanning.
+* Container vulnerability scanning.
+* Kubernetes manifest scanning.
+* SBOM generation.
+* Image signing and verification.
+* Kubernetes admission policies.
+* Runtime threat detection.
+
+Evaluate tools such as Semgrep, Trivy, Syft, Cosign, Kyverno, and Falco.
+
+Do not install every tool automatically. Explain the purpose, resource requirements, and trade-offs before selecting the minimum viable stack.
+
+Create and test policies for:
+
+* Privileged containers.
+* Running as root.
+* Missing resource limits.
+* Unapproved registries.
+* Host networking.
+* Host-path mounts.
+* Required metadata.
+* Image integrity.
+
+Begin in audit mode where possible, then demonstrate controlled enforcement.
+
+Phase 6: Network Security
+
+Implement and validate:
+
+* Default-deny network policies.
+* Explicit application communication.
+* Namespace isolation.
+* Ingress TLS.
+* Service discovery.
+* Administrative access restrictions.
+* Egress restrictions where supported.
+
+Test both allowed and denied traffic.
+
+Document which controls depend on the CNI and which require AWS networking resources.
+
+Phase 7: Observability and Incident Response
+
+Implement an appropriately sized local observability stack.
+
+Evaluate Prometheus, Grafana, Loki, and Alertmanager.
+
+Create dashboards and alerts for:
+
+* Node readiness.
+* API availability.
+* Pod restarts.
+* CPU and memory.
+* Storage.
+* Failed deployments.
+* Policy violations.
+* Authentication and authorization failures.
+
+Create reproducible exercises for:
+
+* Failed deployments.
+* CrashLoopBackOff.
+* Image pull failures.
+* Network policy denial.
+* Resource exhaustion.
+* GitOps drift.
+* API availability failures.
+* etcd quorum failures where safely testable.
+
+Provide recovery procedures and explain the evidence used to identify each root cause.
+
+Phase 8: Terraform and AWS Architecture
+
+Do not create AWS resources during the local implementation phases.
+
+First design the AWS architecture and Terraform modules for:
+
+* VPC.
+* Public and private subnets.
+* Routing.
+* Security groups.
+* EKS.
+* IAM roles and policies.
+* EKS access entries.
+* EKS Pod Identity or IRSA.
+* ECR.
+* KMS.
+* Secrets Manager.
+* CloudWatch.
+* Load balancing.
+* Logging and monitoring.
+
+Use remote Terraform state with locking when the AWS phase is approved.
+
+Use GitHub Actions OIDC instead of long-lived AWS access keys.
+
+Design least-privilege roles for Terraform provisioning and application deployment.
+
+Provide cost estimates and a teardown plan.
+
+Separate Terraform ownership of AWS infrastructure from Argo CD ownership of Kubernetes applications.
+
+Include plan review and approval before applying infrastructure changes.
+
+Repository Structure
+
+Create a clean repository structure similar to:
+
+platform-engineering-lab/
+├── README.md
+├── docs/
+│   ├── architecture.md
+│   ├── security-model.md
+│   ├── iam-model.md
+│   ├── threat-model.md
+│   ├── runbooks/
+│   └── decisions/
+├── scripts/
+│   ├── preflight.sh
+│   ├── validate.sh
+│   └── health-check.sh
+├── local/
+│   ├── k3d/
+│   ├── registry/
+│   └── configuration/
+├── platform/
+│   ├── namespaces/
+│   ├── rbac/
+│   ├── networking/
+│   ├── policies/
+│   ├── secrets/
+│   ├── gitops/
+│   └── observability/
+├── applications/
+│   ├── demo-frontend/
+│   └── demo-backend/
+├── gitops/
+│   ├── bootstrap/
+│   ├── applications/
+│   └── environments/
+├── ci/
+│   └── github-actions/
+└── terraform/
+├── modules/
+└── environments/
+├── dev/
+└── staging/
+
+Adjust this structure if there is a clear architectural reason, but document the decision.
+
+Required Deliverables
+
+1. Architecture diagram.
+2. Architecture decision records.
+3. Threat model.
+4. Working local cluster configuration.
+5. Reproducible installation and validation scripts.
+6. IAM and RBAC examples.
+7. Secrets management configuration.
+8. GitOps repository and reconciliation workflow.
+9. Security policies and automated scans.
+10. Observability dashboards and alerts.
+11. Troubleshooting runbooks.
+12. Terraform AWS design and modules.
+13. Local-versus-AWS implementation comparison.
+14. Cost estimate and teardown instructions.
+15. A final validation report showing which acceptance criteria passed or failed.
+
+Working Method
+
+Begin with Phase 0 only.
+
+Inspect the environment and report findings.
+
+Do not immediately install all components or overwrite existing configuration.
+
+Present the proposed architecture, implementation sequence, risks, and resource requirements.
+
+Wait for approval before making changes to the existing cluster or creating a replacement.
+
+After approval, implement one phase at a time and run its acceptance tests before proceeding.

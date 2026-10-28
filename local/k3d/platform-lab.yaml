@@ -1,0 +1,73 @@
+# k3d cluster definition for the platform lab.
+# Created by scripts/cluster-up.sh, which exports LAB_ROOT (repo root) for the
+# volume paths below. Do not run `k3d cluster create` against this file by hand
+# unless LAB_ROOT is set.
+#
+# Topology: 1 server + 2 agents. A single server uses K3s' SQLite (kine)
+# datastore, so it is not affected by the etcd peer-IP drift that broke
+# dev-cluster after a Docker Desktop restart (see docs/phase-0-diagnostic-report.md
+# and docs/decisions/0001-single-server-topology.md).
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: platform-lab
+servers: 1
+agents: 2
+image: rancher/k3s:v1.35.5-k3s1
+# Network: k3d creates and names it k3d-platform-lab. Neither `network:` (means
+# "join an existing network") nor `subnet:` (k3d's static IPAM collided with the
+# pre-attached registry: "Address already in use") is set — see
+# docs/decisions/0001-single-server-topology.md.
+kubeAPI:
+  host: "127.0.0.1"
+  hostIP: "127.0.0.1"   # loopback only — API is not reachable from the LAN
+  hostPort: "6550"
+ports:
+  # Traefik is a NodePort service (see local/configuration/traefik-config.yaml);
+  # the k3d load balancer forwards loopback ports to it on every node.
+  - port: 127.0.0.1:8081:30080
+    nodeFilters: [loadbalancer]
+  - port: 127.0.0.1:8443:30443
+    nodeFilters: [loadbalancer]
+registries:
+  use:
+    - k3d-registry.localhost:5001
+volumes:
+  - volume: ${LAB_ROOT}/local/configuration/audit-policy.yaml:/etc/rancher/k3s/audit-policy.yaml
+    nodeFilters: [server:*]
+  - volume: ${LAB_ROOT}/local/configuration/traefik-config.yaml:/var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+    nodeFilters: [server:*]
+options:
+  k3d:
+    wait: true
+    timeout: "240s"
+  k3s:
+    extraArgs:
+      # Cilium replaces flannel and the embedded kube-router NetworkPolicy controller.
+      - arg: --flannel-backend=none
+        nodeFilters: [server:*]
+      - arg: --disable-network-policy
+        nodeFilters: [server:*]
+      # klipper-lb relies on hostPort, which Cilium does not provide without
+      # kube-proxy replacement; Traefik is exposed via NodePort instead.
+      - arg: --disable=servicelb
+        nodeFilters: [server:*]
+      # API server audit logging (policy is version-controlled).
+      - arg: --kube-apiserver-arg=audit-policy-file=/etc/rancher/k3s/audit-policy.yaml
+        nodeFilters: [server:*]
+      - arg: --kube-apiserver-arg=audit-log-path=/var/log/kubernetes/audit/audit.log
+        nodeFilters: [server:*]
+      - arg: --kube-apiserver-arg=audit-log-maxage=7
+        nodeFilters: [server:*]
+      - arg: --kube-apiserver-arg=audit-log-maxbackup=3
+        nodeFilters: [server:*]
+      - arg: --kube-apiserver-arg=audit-log-maxsize=50
+        nodeFilters: [server:*]
+    nodeLabels:
+      - label: lab.platform/role=control-plane
+        nodeFilters: [server:*]
+      - label: lab.platform/role=worker
+        nodeFilters: [agent:*]
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
