@@ -10,6 +10,9 @@ notifications:
 configs:
   params:
     server.insecure: true        # TLS terminates at Traefik in Phase 6; loopback-only until then
+    # Fail a sync that cannot become healthy instead of blocking the app forever
+    # (seen when the first build lacked an arm64 image).
+    controller.sync.timeout.seconds: "600"
   cm:
     admin.enabled: true
     exec.enabled: false          # no web terminal into pods

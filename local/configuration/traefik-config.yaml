@@ -15,6 +15,17 @@ spec:
         nodePort: 30080
       websecure:
         nodePort: 30443
+    # NodePort exposure leaves Ingress .status empty, which Argo CD reads as
+    # "Progressing" forever. Publish the real (loopback) endpoint instead —
+    # the AWS Load Balancer Controller does the equivalent with the ALB hostname.
+    # (The chart default publishes kube-system/traefik's LB status, which is
+    # empty for a NodePort Service, so that is turned off.)
+    providers:
+      kubernetesIngress:
+        publishedService:
+          enabled: false
+    additionalArguments:
+      - --providers.kubernetesingress.ingressendpoint.ip=127.0.0.1
     resources:
       requests:
         cpu: 50m
