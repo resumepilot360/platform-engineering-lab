@@ -21,10 +21,10 @@ patches:
         value: demo.staging.lab.localhost
 images:
   - name: demo-backend
-    newName: k3d-registry.localhost:5001/lab/demo-backend
-    newTag: unreleased
+    newName: ghcr.io/resumepilot360/demo-backend
+    digest: sha256:3135a1bedbc6b2475ae8d5e716c5a772b448bd27fc863ba5ca01db76e62d7dbc
   - name: demo-frontend
-    newName: k3d-registry.localhost:5001/lab/demo-frontend
-    newTag: unreleased
+    newName: ghcr.io/resumepilot360/demo-frontend
+    digest: sha256:693cdf769a886134151b26d52016b0e95e4637f634c9b88f713f76675a14156e
 components:
   - ../../components/smoke-hook
