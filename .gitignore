@@ -9,7 +9,7 @@ kubeconfig*
 *.p12
 .env
 *.env.local
-secrets/
+/secrets/
 *.tfstate
 *.tfstate.*
 .terraform/

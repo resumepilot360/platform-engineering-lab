@@ -1,0 +1,139 @@
+Preflight: tools
+  PASS docker daemon reachable
+  PASS k3d >= v5.9.0
+  PASS kubectl client == v1.35.10
+  PASS helm installed
+  PASS cilium-cli >= v0.20.1
+  PASS k9s installed
+  PASS jq installed
+  PASS yq installed
+  PASS kubeconform installed
+Preflight: Docker resources
+  PASS Docker CPUs >= 4 (have 6)
+  PASS Docker memory >= 8 GiB (have 15)
+  PASS host disk free >= 20 GiB (have 22)
+Preflight: host ports
+  PASS port 6550 free or owned by lab
+  PASS port 8081 free or owned by lab
+  PASS port 8443 free or owned by lab
+  PASS port 5001 free or owned by lab
+  PASS port 5011 free or owned by lab
+  PASS port 5012 free or owned by lab
+  PASS port 5013 free or owned by lab
+Preflight: other clusters
+
+19 passed, 0 failed
+[lab] Mirroring docker.io/traefik/whoami:v1.11.0 -> localhost:5001/lab/whoami:v1.11.0
+[lab] Mirroring docker.io/library/busybox:1.37.0 -> localhost:5001/lab/busybox:1.37.0
+[lab] Registry catalog: {"repositories":["lab/busybox","lab/whoami"]}
+[lab] Cluster platform-lab exists; starting it
+[36mINFO[0m[0000] Using the k3d-tools node to gather environment information 
+[36mINFO[0m[0000] Starting new tools node...                   
+[36mINFO[0m[0000] Starting node 'k3d-platform-lab-tools'       
+[36mINFO[0m[0001] Starting cluster 'platform-lab'              
+[36mINFO[0m[0001] All servers already running.                 
+[36mINFO[0m[0001] All agents already running.                  
+[36mINFO[0m[0001] All helpers already running.                 
+[36mINFO[0m[0001] Started cluster 'platform-lab'               
+[lab] Installing Cilium 1.20.4
+Release "cilium" has been upgraded. Happy Helming!
+NAME: cilium
+LAST DEPLOYED: Wed Oct 28 18:17:58 2026
+NAMESPACE: kube-system
+STATUS: deployed
+REVISION: 5
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+NOTES:
+You have successfully installed Cilium with Hubble Relay.
+
+WARNINGS:
+- WARNING: TLS is not enabled for the Hubble Relay server (hubble.relay.tls.server.enabled=false).
+  This means Hubble Relay communications may not be encrypted. For more information about the security
+  implications and suggested controls, please see: https://docs.cilium.io/en/stable/security/threat-model/#hubble-data-attacker
+
+Your release version is 1.20.4.
+
+For any further help, visit https://docs.cilium.io/en/v1.20/gettinghelp
+[lab] Waiting for nodes
+node/k3d-platform-lab-agent-0 condition met
+node/k3d-platform-lab-agent-1 condition met
+node/k3d-platform-lab-server-0 condition met
+[lab] Applying bootstrap namespaces
+namespace/argocd created
+namespace/external-secrets configured
+namespace/openbao configured
+[lab] Installing External Secrets Operator 2.14.0 and OpenBao 0.30.6
+Release "external-secrets" has been upgraded. Happy Helming!
+NAME: external-secrets
+LAST DEPLOYED: Wed Oct 28 18:18:05 2026
+NAMESPACE: external-secrets
+STATUS: deployed
+REVISION: 5
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+NOTES:
+external-secrets has been deployed successfully in namespace external-secrets!
+
+In order to begin using ExternalSecrets, you will need to set up a SecretStore
+or ClusterSecretStore resource (for example, by creating a 'vault' SecretStore).
+
+More information on the different types of SecretStores and how to configure them
+can be found in our Github: https://github.com/external-secrets/external-secrets
+Release "openbao" has been upgraded. Happy Helming!
+NAME: openbao
+LAST DEPLOYED: Wed Oct 28 18:18:09 2026
+NAMESPACE: openbao
+STATUS: deployed
+REVISION: 7
+DESCRIPTION: Upgrade complete
+NOTES:
+Thank you for installing OpenBao!
+
+Now that you have deployed OpenBao, you should look over the docs on using
+OpenBao with Kubernetes available here:
+
+https://openbao.org/docs/
+
+
+Your release is named openbao. To learn more about the release, try:
+
+  $ helm status openbao
+  $ helm get manifest openbao
+[lab] Enabling KV v2 mount kv-prod/
+[lab] Policies: default,demo-dev-read,demo-prod-read,demo-staging-read,secrets-operator,root
+[lab] Roles:    eso-demo-dev,eso-demo-prod,eso-demo-staging
+[lab] Seeding kv-prod/demo/backend with generated values
+[lab] OpenBao ready
+[lab] Installing Argo CD 10.11.6
+Release "argocd" does not exist. Installing it now.
+NAME: argocd
+LAST DEPLOYED: Wed Oct 28 18:18:13 2026
+NAMESPACE: argocd
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+TEST SUITE: None
+NOTES:
+In order to access the server UI you have the following options:
+
+1. kubectl port-forward service/argocd-server -n argocd 8080:443
+
+    and then open the browser on http://localhost:8080 and accept the certificate
+
+2. enable ingress in the values file `server.ingress.enabled` and either
+      - Add the annotation for ssl passthrough: https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#option-1-ssl-passthrough
+      - Set the `configs.params."server.insecure"` in the values file and terminate SSL at your ingress: https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#option-2-multiple-ingress-objects-and-hosts
+
+
+After reaching the UI the first time you can login with username: admin and the random password generated during the installation. You can find the password by running:
+
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+
+(You should delete the initial secret afterwards as suggested by the Getting Started Guide: https://argo-cd.readthedocs.io/en/stable/getting_started/#4-login-using-the-cli)
+application.argoproj.io/root created
+[lab] Waiting for Argo CD to sync platform applications
+application.argoproj.io/platform-namespaces condition met
+application.argoproj.io/platform-namespaces condition met
+application.argoproj.io/platform-rbac condition met
+application.argoproj.io/platform-rbac condition met
