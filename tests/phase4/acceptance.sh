@@ -9,6 +9,11 @@ is_state()  { [[ "$(app_state "$1")" == "$2" ]]; }
 wait_state() { local a="$1" want="$2" t="${3:-180}"; for _ in $(seq 1 $((t/5))); do is_state "$a" "$want" && return 0; sleep 5; done; return 1; }
 cleanup() { kc -n argocd delete application p4-guardrail-ns p4-guardrail-secret --ignore-not-found >/dev/null 2>&1 || true; }
 trap cleanup EXIT
+hook_ok() { # job evidence, or the last operation's recorded hook result
+  [[ $(kc -n "demo-$1" get job smoke-test -o jsonpath='{.status.succeeded}' 2>/dev/null) == 1 ]] && return 0
+  kc -n argocd get application "demo-$1" -o json | jq -e \
+    '.status.operationState.syncResult.resources // [] | any(.kind=="Job" and .name=="smoke-test" and .hookPhase=="Succeeded")' >/dev/null
+}
 
 echo "== Argo CD"
 check "Argo CD UI served via ingress" bash -c "[[ \$(curl -s -o /dev/null -w '%{http_code}' http://argocd.lab.localhost:$INGRESS_HTTP_PORT/) == 200 ]]"
@@ -23,8 +28,16 @@ check "platform-rbac owns lab:platform-operator" bash -c \
 echo "== Delivery"
 for env in dev staging prod; do
   check "demo-$env Synced/Healthy" wait_state "demo-$env" Synced/Healthy 240
-  check "demo-$env PostSync smoke hook succeeded" bash -c \
-    "[[ \$(kubectl --context $KUBE_CONTEXT -n demo-$env get job smoke-test -o jsonpath='{.status.succeeded}') == 1 ]]"
+  # Hook Jobs expire (ttlSecondsAfterFinished) and self-heal syncs skip hooks,
+  # so evidence is produced on demand: auto-synced envs get a fresh sync; prod is
+  # never synced by the test (manual gate) and must show its last hook result.
+  if [[ $env != prod ]] && ! hook_ok "$env"; then
+    kc -n argocd patch application "demo-$env" --type merge \
+      -p '{"operation":{"initiatedBy":{"username":"phase4-test"},"sync":{"revision":"main"}}}' >/dev/null
+    sleep 5; wait_state "demo-$env" Synced/Healthy 240 >/dev/null
+    for _ in $(seq 1 36); do hook_ok "$env" && break; sleep 5; done
+  fi
+  check "demo-$env PostSync smoke hook succeeded" hook_ok "$env"
   for app in demo-backend demo-frontend; do
     pin=$(yq ".images[] | select(.name==\"$app\") | .digest" "$LAB_ROOT/gitops/environments/$env/kustomization.yaml")
     check "demo-$env $app pinned by digest in Git" bash -c "[[ '$pin' == sha256:* ]]"

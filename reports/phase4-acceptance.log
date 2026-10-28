@@ -1,0 +1,48 @@
+== Argo CD
+  PASS Argo CD UI served via ingress
+  PASS initial admin secret exists
+  PASS root app-of-apps Synced/Healthy
+  PASS platform-namespaces Synced/Healthy
+  PASS platform-rbac Synced/Healthy
+  PASS platform-secret-stores Synced/Healthy
+  PASS lab-portal Synced/Healthy
+  PASS platform-rbac owns lab:platform-operator
+== Delivery
+  PASS demo-dev Synced/Healthy
+  PASS demo-dev PostSync smoke hook succeeded
+  PASS demo-dev demo-backend pinned by digest in Git
+  PASS demo-dev demo-backend running the pinned digest
+  PASS demo-dev demo-frontend pinned by digest in Git
+  PASS demo-dev demo-frontend running the pinned digest
+  PASS http://demo.dev.lab.localhost: frontend -> backend -> secret
+  PASS demo-staging Synced/Healthy
+  PASS demo-staging PostSync smoke hook succeeded
+  PASS demo-staging demo-backend pinned by digest in Git
+  PASS demo-staging demo-backend running the pinned digest
+  PASS demo-staging demo-frontend pinned by digest in Git
+  PASS demo-staging demo-frontend running the pinned digest
+  PASS http://demo.staging.lab.localhost: frontend -> backend -> secret
+  PASS demo-prod Synced/Healthy
+  PASS demo-prod PostSync smoke hook succeeded
+  PASS demo-prod demo-backend pinned by digest in Git
+  PASS demo-prod demo-backend running the pinned digest
+  PASS demo-prod demo-frontend pinned by digest in Git
+  PASS demo-prod demo-frontend running the pinned digest
+  PASS http://demo.prod.lab.localhost: frontend -> backend -> secret
+  PASS prod has no automated sync (manual gate)
+  PASS staging and prod run the same digests as each other
+== AppProject guardrails
+  PASS demo project refuses destination kube-system
+  PASS demo project refuses to sync a Secret
+  PASS ...and the Secret does not exist
+== Drift: dev self-heals
+  PASS manual scale reverted to Git (1 replica)
+  PASS deleted Service recreated
+  PASS demo-dev back to Synced/Healthy
+== Drift: prod is detected, not auto-reverted
+  PASS prod drift detected (OutOfSync)
+  PASS prod drift left in place (no self-heal)
+  PASS manual sync reconciles prod to Git (2 replicas)
+  PASS demo-prod back to Synced/Healthy
+
+41 passed, 0 failed
