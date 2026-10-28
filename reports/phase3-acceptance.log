@@ -1,0 +1,69 @@
+== Encryption at rest (K3s datastore)
+  PASS secrets-encrypt status Enabled
+  PASS active provider is secretbox
+  PASS control: ConfigMap canary IS plaintext on disk
+  PASS Secret canary NOT plaintext on disk
+  PASS Secret stored with k8s:enc:secretbox prefix
+  PASS Secret still readable through the API
+== OpenBao
+  PASS initialised and unsealed
+  PASS unseal material is mode 600 and gitignored
+  PASS audit device enabled
+  PASS operator token cannot write policies
+  PASS operator token cannot read sys/audit
+== External Secrets delivery
+  PASS demo-dev SecretStore Ready
+  PASS demo-dev ExternalSecret synced
+  PASS demo-dev Secret has 3 keys
+  PASS demo-dev Secret owned by its ExternalSecret
+  PASS demo-staging SecretStore Ready
+  PASS demo-staging ExternalSecret synced
+  PASS demo-staging Secret has 3 keys
+  PASS demo-staging Secret owned by its ExternalSecret
+  PASS dev Secret carries dev username
+  PASS staging Secret carries staging username
+  PASS dev and staging passwords differ
+  PASS ExternalSecret manifests in Git contain no values
+== Access restrictions: OpenBao
+  PASS control: dev eso-reader + audience=openbao logs in to eso-demo-dev
+  PASS dev token policies = [default, demo-dev-read]
+  PASS dev token reads kv-dev
+  PASS dev token DENIED kv-staging
+  PASS dev token DENIED listing secrets
+  PASS default-audience token rejected (403)
+  PASS staging SA cannot use dev role (403)
+  PASS other SA in demo-dev cannot use role (403)
+== Access restrictions: through ESO
+  PASS dev ExternalSecret for staging data fails
+  PASS ...and no Secret was created
+== Access restrictions: Kubernetes RBAC
+  PASS alice credentials authenticate (precondition)
+  PASS dana credentials authenticate (precondition)
+  PASS riley credentials authenticate (precondition)
+  PASS dana CANNOT read synced Secret
+  PASS dana CAN see ExternalSecret status
+  PASS dana CANNOT create SecretStores
+  PASS riley CANNOT read synced Secret
+  PASS alice CANNOT create ClusterSecretStores
+== Rotation: application secret
+  PASS dev Secret updated within 2 min of rotation
+  PASS dev Secret matches OpenBao's new value
+  PASS staging untouched by dev rotation
+  PASS previous version retained for rollback
+== Rotation: datastore encryption key
+  PASS key rotation completed (reencrypt_finished)
+  PASS canary readable after key rotation
+  PASS ESO Secret readable after key rotation
+== OpenBao persistence across restart
+  PASS restarted pod comes up sealed (manual unseal model)
+  PASS unseal script recovers it
+  PASS rotated value survived restart
+== Leak checks
+  PASS control: Request-level canary found in K8s audit log
+  PASS app password NOT in K8s audit log
+  PASS Secret canary NOT in K8s audit log
+  PASS app password NOT in OpenBao audit log (HMAC'd)
+  PASS OpenBao audit log records reads
+  PASS app password NOT in repo or reports
+
+57 passed, 0 failed

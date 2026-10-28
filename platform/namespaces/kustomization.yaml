@@ -4,3 +4,4 @@ resources:
   - demo-dev.yaml
   - demo-staging.yaml
   - lab-smoke.yaml
+  - platform-services.yaml

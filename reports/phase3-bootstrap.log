@@ -1,0 +1,168 @@
+Preflight: tools
+  PASS docker daemon reachable
+  PASS k3d >= v5.9.0
+  PASS kubectl client == v1.35.10
+  PASS helm installed
+  PASS cilium-cli >= v0.20.1
+  PASS k9s installed
+  PASS jq installed
+  PASS yq installed
+  PASS kubeconform installed
+Preflight: Docker resources
+  PASS Docker CPUs >= 4 (have 6)
+  PASS Docker memory >= 8 GiB (have 15)
+  PASS host disk free >= 20 GiB (have 27)
+Preflight: host ports
+  PASS port 6550 free or owned by lab
+  PASS port 8081 free or owned by lab
+  PASS port 8443 free or owned by lab
+  PASS port 5001 free or owned by lab
+  PASS port 5011 free or owned by lab
+  PASS port 5012 free or owned by lab
+  PASS port 5013 free or owned by lab
+Preflight: other clusters
+
+19 passed, 0 failed
+[lab] Mirroring docker.io/traefik/whoami:v1.11.0 -> localhost:5001/lab/whoami:v1.11.0
+[lab] Mirroring docker.io/library/busybox:1.37.0 -> localhost:5001/lab/busybox:1.37.0
+[lab] Registry catalog: {"repositories":["lab/busybox","lab/whoami"]}
+[lab] Cluster platform-lab exists; starting it
+[36mINFO[0m[0000] Using the k3d-tools node to gather environment information 
+[36mINFO[0m[0000] Starting new tools node...                   
+[36mINFO[0m[0000] Starting node 'k3d-platform-lab-tools'       
+[36mINFO[0m[0001] Starting cluster 'platform-lab'              
+[36mINFO[0m[0001] All servers already running.                 
+[36mINFO[0m[0001] All agents already running.                  
+[36mINFO[0m[0001] All helpers already running.                 
+[36mINFO[0m[0001] Started cluster 'platform-lab'               
+[lab] Installing Cilium 1.20.4
+Release "cilium" has been upgraded. Happy Helming!
+NAME: cilium
+LAST DEPLOYED: Wed Oct 28 17:53:25 2026
+NAMESPACE: kube-system
+STATUS: deployed
+REVISION: 4
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+NOTES:
+You have successfully installed Cilium with Hubble Relay.
+
+WARNINGS:
+- WARNING: TLS is not enabled for the Hubble Relay server (hubble.relay.tls.server.enabled=false).
+  This means Hubble Relay communications may not be encrypted. For more information about the security
+  implications and suggested controls, please see: https://docs.cilium.io/en/stable/security/threat-model/#hubble-data-attacker
+
+Your release version is 1.20.4.
+
+For any further help, visit https://docs.cilium.io/en/v1.20/gettinghelp
+[lab] Waiting for nodes
+node/k3d-platform-lab-agent-0 condition met
+node/k3d-platform-lab-agent-1 condition met
+node/k3d-platform-lab-server-0 condition met
+[lab] Applying platform namespaces and RBAC
+namespace/demo-dev unchanged
+namespace/demo-staging unchanged
+namespace/external-secrets unchanged
+namespace/lab-smoke unchanged
+namespace/openbao unchanged
+resourcequota/namespace-quota unchanged
+resourcequota/namespace-quota unchanged
+resourcequota/namespace-quota unchanged
+limitrange/default-limits unchanged
+limitrange/default-limits unchanged
+limitrange/default-limits unchanged
+serviceaccount/config-reader unchanged
+serviceaccount/demo-backend unchanged
+role.rbac.authorization.k8s.io/app-developer unchanged
+role.rbac.authorization.k8s.io/read-app-config unchanged
+clusterrole.rbac.authorization.k8s.io/lab:break-glass-elevator unchanged
+clusterrole.rbac.authorization.k8s.io/lab:platform-operator unchanged
+clusterrole.rbac.authorization.k8s.io/lab:security-auditor unchanged
+rolebinding.rbac.authorization.k8s.io/config-reader:read-app-config unchanged
+rolebinding.rbac.authorization.k8s.io/developers:app-developer unchanged
+rolebinding.rbac.authorization.k8s.io/developers:view unchanged
+clusterrolebinding.rbac.authorization.k8s.io/lab:auditors:security-auditor unchanged
+clusterrolebinding.rbac.authorization.k8s.io/lab:auditors:view unchanged
+clusterrolebinding.rbac.authorization.k8s.io/lab:break-glass:cluster-admin unchanged
+clusterrolebinding.rbac.authorization.k8s.io/lab:platform-admins:break-glass-elevator unchanged
+clusterrolebinding.rbac.authorization.k8s.io/lab:platform-admins:operator unchanged
+clusterrolebinding.rbac.authorization.k8s.io/lab:platform-admins:view unchanged
+configmap/app-config unchanged
+[lab] Installing External Secrets Operator 2.14.0 and OpenBao 0.30.6
+Release "external-secrets" has been upgraded. Happy Helming!
+NAME: external-secrets
+LAST DEPLOYED: Wed Oct 28 17:53:31 2026
+NAMESPACE: external-secrets
+STATUS: deployed
+REVISION: 4
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+NOTES:
+external-secrets has been deployed successfully in namespace external-secrets!
+
+In order to begin using ExternalSecrets, you will need to set up a SecretStore
+or ClusterSecretStore resource (for example, by creating a 'vault' SecretStore).
+
+More information on the different types of SecretStores and how to configure them
+can be found in our Github: https://github.com/external-secrets/external-secrets
+Release "openbao" has been upgraded. Happy Helming!
+NAME: openbao
+LAST DEPLOYED: Wed Oct 28 17:53:34 2026
+NAMESPACE: openbao
+STATUS: deployed
+REVISION: 6
+DESCRIPTION: Upgrade complete
+NOTES:
+Thank you for installing OpenBao!
+
+Now that you have deployed OpenBao, you should look over the docs on using
+OpenBao with Kubernetes available here:
+
+https://openbao.org/docs/
+
+
+Your release is named openbao. To learn more about the release, try:
+
+  $ helm status openbao
+  $ helm get manifest openbao
+[lab] Policies: default,demo-dev-read,demo-staging-read,secrets-operator,root
+[lab] Roles:    eso-demo-dev,eso-demo-staging
+[lab] OpenBao ready
+serviceaccount/eso-reader created
+serviceaccount/eso-reader created
+externalsecret.external-secrets.io/demo-backend-db created
+externalsecret.external-secrets.io/demo-backend-db created
+secretstore.external-secrets.io/openbao created
+secretstore.external-secrets.io/openbao created
+[lab] Waiting for core add-ons
+deployment "coredns" successfully rolled out
+deployment "metrics-server" successfully rolled out
+deployment "local-path-provisioner" successfully rolled out
+deployment "traefik" successfully rolled out
+[lab] Applying lab portal (http://lab.localhost:8081)
+namespace/lab-portal created
+configmap/portal-www-bcdg82g8kh created
+service/portal created
+deployment.apps/portal created
+ingress.networking.k8s.io/portal created
+Waiting for deployment "portal" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "portal" rollout to finish: 0 of 1 updated replicas are available...
+deployment "portal" successfully rolled out
+Cluster health: k3d-platform-lab
+  PASS API /readyz (host :6550)
+  PASS API /livez
+  PASS 3 nodes Ready
+  PASS Cilium healthy
+  PASS kube-system/coredns available
+  PASS kube-system/metrics-server available
+  PASS kube-system/local-path-provisioner available
+  PASS kube-system/traefik available
+  PASS kube-system/cilium-operator available
+  PASS kube-system/hubble-relay available
+  PASS no kube-system pods outside Running/Succeeded
+  PASS metrics API serving (kubectl top nodes)
+  PASS registry reachable from host
+  PASS audit log being written
+
+14 passed, 0 failed
+bash scripts/cluster-up.sh  11.13s user 3.88s system 54% cpu 27.735 total

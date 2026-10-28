@@ -1,0 +1,84 @@
+# Lab portal: one page linking every lab endpoint (http://lab.localhost:8081).
+# Static HTML from a ConfigMap, served by busybox httpd from the local registry.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-portal
+  labels:
+    lab.platform/environment: platform
+    lab.platform/managed-by: platform-team
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  namespace: lab-portal
+  labels: {app.kubernetes.io/name: portal, app.kubernetes.io/part-of: lab-platform}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: portal}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: portal, app.kubernetes.io/part-of: lab-platform}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: httpd
+          image: k3d-registry.localhost:5001/lab/busybox:1.37.0
+          command: ["httpd", "-f", "-v", "-p", "8080", "-h", "/www"]
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 5m, memory: 8Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: www, mountPath: /www, readOnly: true}
+      volumes:
+        - name: www
+          configMap: {name: portal-www}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+  namespace: lab-portal
+spec:
+  selector: {app.kubernetes.io/name: portal}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal
+  namespace: lab-portal
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: lab.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: portal, port: {name: http}}

@@ -32,8 +32,8 @@ Cluster health: k3d-platform-lab
 == AC6: persistent storage
   PASS PVC Bound
   PASS write to volume
-  PASS data survives pod replacement (storage-probe-84c7f9b87-zzpgh -> storage-probe-84c7f9b87-vrdrs)
-  PASS replacement pinned to same node by PV affinity (k3d-platform-lab-agent-1)
+  PASS data survives pod replacement (storage-probe-84c7f9b87-k2tcc -> storage-probe-84c7f9b87-wllwx)
+  PASS replacement pinned to same node by PV affinity (k3d-platform-lab-server-0)
   PASS root filesystem is read-only
 == AC7: reproducible from configuration
   PASS static validation passes

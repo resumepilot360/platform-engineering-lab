@@ -22,9 +22,10 @@ check "host disk free >= 20 GiB (have $free_gib)" test "$free_gib" -ge 20
 echo "Preflight: host ports"
 port_ok() { # free, or already held by our own k3d containers
   ! lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 && return 0
-  docker ps --format '{{.Names}} {{.Ports}}' | grep -E "^(k3d-$CLUSTER_NAME-serverlb|$REGISTRY_CONTAINER) .*:$1->" >/dev/null
+  docker ps --format '{{.Names}} {{.Ports}}' | grep -E "^(k3d-$CLUSTER_NAME-serverlb|$REGISTRY_CONTAINER|k3d-mirror-[a-z]+\.localhost) .*:$1->" >/dev/null
 }
-for p in "$API_PORT" "$INGRESS_HTTP_PORT" "$INGRESS_HTTPS_PORT" "$REGISTRY_PORT"; do
+mirror_ports=$(for m in $MIRRORS; do echo "${m##*|}"; done)
+for p in "$API_PORT" "$INGRESS_HTTP_PORT" "$INGRESS_HTTPS_PORT" "$REGISTRY_PORT" $mirror_ports; do
   check "port $p free or owned by lab" port_ok "$p"
 done
 

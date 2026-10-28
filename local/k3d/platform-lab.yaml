@@ -32,6 +32,19 @@ ports:
 registries:
   use:
     - k3d-registry.localhost:5001
+    - k3d-mirror-quay.localhost:5011
+    - k3d-mirror-dockerhub.localhost:5012
+    - k3d-mirror-ghcr.localhost:5013
+  # K3s containerd mirrors: upstream pulls go through the local pull-through
+  # caches first, falling back to the upstream if a cache is unavailable.
+  config: |
+    mirrors:
+      quay.io:
+        endpoint: ["http://k3d-mirror-quay.localhost:5000"]
+      docker.io:
+        endpoint: ["http://k3d-mirror-dockerhub.localhost:5000"]
+      ghcr.io:
+        endpoint: ["http://k3d-mirror-ghcr.localhost:5000"]
 volumes:
   - volume: ${LAB_ROOT}/local/configuration/audit-policy.yaml:/etc/rancher/k3s/audit-policy.yaml
     nodeFilters: [server:*]
@@ -51,6 +64,12 @@ options:
       # klipper-lb relies on hostPort, which Cilium does not provide without
       # kube-proxy replacement; Traefik is exposed via NodePort instead.
       - arg: --disable=servicelb
+        nodeFilters: [server:*]
+      # Encrypt Secrets at rest in the datastore (ADR-0008). secretbox =
+      # XSalsa20-Poly1305 (authenticated); upstream discourages aescbc.
+      - arg: --secrets-encryption
+        nodeFilters: [server:*]
+      - arg: --secrets-encryption-provider=secretbox
         nodeFilters: [server:*]
       # API server audit logging (policy is version-controlled).
       - arg: --kube-apiserver-arg=audit-policy-file=/etc/rancher/k3s/audit-policy.yaml

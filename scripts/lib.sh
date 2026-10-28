@@ -21,7 +21,7 @@ kc()   { kubectl --context "$KUBE_CONTEXT" "$@"; }
 hc()   { helm --kube-context "$KUBE_CONTEXT" "$@"; }
 
 cluster_exists()  { k3d cluster list -o json | jq -e --arg n "$CLUSTER_NAME" '.[] | select(.name==$n)' >/dev/null; }
-registry_exists() { docker inspect "$REGISTRY_CONTAINER" >/dev/null 2>&1; }
+registry_exists() { docker inspect "${1:-$REGISTRY_CONTAINER}" >/dev/null 2>&1; }
 
 # Simple pass/fail accounting for test scripts.
 PASS=0; FAIL=0; RESULTS=()
