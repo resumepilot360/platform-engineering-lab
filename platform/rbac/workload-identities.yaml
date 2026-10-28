@@ -1,0 +1,19 @@
+# Runtime identity for demo-backend in every environment (dev's is in
+# service-accounts.yaml alongside the Phase 2 examples). Zero API permissions,
+# no token mounted. Platform-owned: the `demo` AppProject ships workloads, not
+# identities. Missing in staging/prod was caught by the first staging promotion.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-backend
+  namespace: demo-staging
+  labels: {lab.platform/managed-by: platform-team}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-backend
+  namespace: demo-prod
+  labels: {lab.platform/managed-by: platform-team}
+automountServiceAccountToken: false

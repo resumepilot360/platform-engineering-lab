@@ -7,3 +7,4 @@ resources:
   - demo-staging.yaml
   - service-accounts.yaml
   - demo-prod.yaml
+  - workload-identities.yaml
