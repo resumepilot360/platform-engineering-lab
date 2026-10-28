@@ -30,7 +30,7 @@ func New(backendURL, version string) *Server {
 var page = template.Must(template.New("page").Parse(`<!doctype html>
 <html><head><meta charset="utf-8"><title>Platform Lab Demo</title></head>
 <body>
-<h1>{{.Greeting.Message}}</h1>
+<h1>{{.Greeting.Message}}!</h1>
 <p>backend {{.Greeting.Version}} · frontend {{.FrontendVersion}} · env {{.Greeting.Environment}} · db configured: {{.Greeting.DBConfigured}}</p>
 </body></html>`))
 
