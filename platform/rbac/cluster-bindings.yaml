@@ -1,0 +1,55 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab:platform-admins:view
+  labels: {lab.platform/managed-by: platform-team}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: "lab:platform-admins"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab:platform-admins:operator
+  labels: {lab.platform/managed-by: platform-team}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: "lab:platform-operator"}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: "lab:platform-admins"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab:platform-admins:break-glass-elevator
+  labels: {lab.platform/managed-by: platform-team}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: "lab:break-glass-elevator"}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: "lab:platform-admins"}
+---
+# The only path to cluster-admin for humans. Every use appears in the audit log
+# with user.username=<real admin> and impersonatedUser.username=break-glass.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab:break-glass:cluster-admin
+  labels: {lab.platform/managed-by: platform-team}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: cluster-admin}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: "lab:break-glass"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab:auditors:view
+  labels: {lab.platform/managed-by: platform-team}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: "lab:auditors"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab:auditors:security-auditor
+  labels: {lab.platform/managed-by: platform-team}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: "lab:security-auditor"}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: "lab:auditors"}

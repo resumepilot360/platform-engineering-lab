@@ -1,0 +1,65 @@
+== Setup: apply RBAC and issue persona certificates (24h)
+== Authentication
+  PASS no credentials -> 401
+  PASS bogus bearer -> 401
+  PASS self-signed cert claiming system:masters -> 401
+  PASS alice authenticates with groups [lab:platform-admins]
+  PASS dana authenticates with groups [lab:developers]
+  PASS riley authenticates with groups [lab:auditors]
+  PASS persona certs expire within 25h
+== Authorization: platform admin (alice)
+  PASS alice CAN    list pods -A
+  PASS alice CAN    patch nodes
+  PASS alice CAN    create pods --subresource=eviction -n demo-dev
+  PASS alice CAN    create namespaces
+  PASS alice CANNOT delete namespaces
+  PASS alice CANNOT get secrets -n kube-system
+  PASS alice CANNOT create clusterrolebindings
+  PASS alice CANNOT create pods --subresource=exec -n demo-dev
+  PASS alice CAN    impersonate users/break-glass
+  PASS alice CANNOT impersonate users/admin
+  PASS alice CANNOT impersonate groups/system:masters
+  PASS alice as break-glass CAN get secrets (elevated)
+== Authorization: developer (dana)
+  PASS dana CAN    create deployments -n demo-dev
+  PASS dana CAN    create pods --subresource=exec -n demo-dev
+  PASS dana CAN    list pods -n demo-staging
+  PASS dana CANNOT create deployments -n demo-staging
+  PASS dana CANNOT create pods --subresource=exec -n demo-staging
+  PASS dana CANNOT get secrets -n demo-dev
+  PASS dana CANNOT create rolebindings -n demo-dev
+  PASS dana CANNOT create roles -n demo-dev
+  PASS dana CANNOT create serviceaccounts -n demo-dev
+  PASS dana CANNOT list pods -n kube-system
+  PASS dana CANNOT impersonate users/break-glass
+== Authorization: auditor (riley)
+  PASS riley CAN    list pods -A
+  PASS riley CAN    list clusterrolebindings
+  PASS riley CAN    get roles -n demo-dev
+  PASS riley CANNOT get secrets -A
+  PASS riley CANNOT delete pods -n demo-dev
+  PASS riley CANNOT create pods --subresource=exec -n demo-dev
+  PASS riley CANNOT patch deployments -n demo-dev
+== Real operations
+  PASS dana creates + deletes a deployment in demo-dev
+  PASS dana denied reading secrets (403)
+  PASS alice break-glass read of kube-system secrets succeeds
+  PASS alice cannot add system:masters to break-glass (403)
+== Service accounts
+  PASS config-reader GET configmap/app-config -> 200
+  PASS config-reader GET configmap/kube-root-ca.crt -> 403
+  PASS config-reader LIST configmaps -> 403
+  PASS config-reader LIST secrets -> 403
+  PASS config-reader cross-namespace read -> 403
+  PASS demo-backend has no resource permissions
+  PASS config-reader has exactly one resource rule
+  PASS demo-backend token not automounted
+== Audit evidence
+  PASS denied secret read by dana recorded (403)
+  PASS break-glass use attributed to alice
+  PASS secret access logged at Metadata only (no payload)
+  PASS RBAC change logged with full request body
+  PASS failed group impersonation recorded against alice
+  PASS failed authentication recorded (401)
+
+55 passed, 0 failed

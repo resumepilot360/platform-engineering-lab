@@ -1,0 +1,77 @@
+# Cluster-scoped roles for human personas. Identities arrive as groups
+# (x509 O= field locally; OIDC groups claim or EKS access entries on AWS).
+#
+#   lab:platform-admins  day-to-day platform operations, no secrets, no RBAC
+#                        writes, no deletes of namespaces; can elevate to
+#                        break-glass via audited impersonation
+#   lab:auditors         read-only everywhere incl. RBAC objects, never secrets
+#   lab:break-glass      cluster-admin; only reachable through impersonation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: lab:platform-operator
+  labels: {lab.platform/managed-by: platform-team}
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch"]          # cordon / uncordon / label
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]          # clear stuck pods
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]                                  # kubectl drain
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch", "patch"]           # rollout restart / scale
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["", "events.k8s.io"]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: lab:break-glass-elevator
+  labels: {lab.platform/managed-by: platform-team}
+rules:
+  # Impersonating a group requires impersonating a user too; both are pinned
+  # by resourceNames so admins cannot impersonate arbitrary identities.
+  - apiGroups: [""]
+    resources: ["users"]
+    verbs: ["impersonate"]
+    resourceNames: ["break-glass"]
+  - apiGroups: [""]
+    resources: ["groups"]
+    verbs: ["impersonate"]
+    resourceNames: ["lab:break-glass"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: lab:security-auditor
+  labels: {lab.platform/managed-by: platform-team}
+rules:
+  # Built-in `view` (bound separately) excludes RBAC objects; auditors need them.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes", "namespaces", "persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["validatingwebhookconfigurations", "mutatingwebhookconfigurations",
+                "validatingadmissionpolicies", "validatingadmissionpolicybindings"]
+    verbs: ["get", "list", "watch"]

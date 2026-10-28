@@ -55,3 +55,16 @@ Expected until Cilium is installed (no CNI). Check `cilium --context k3d-platfor
 The single server has no peers, so IP changes are harmless. Run
 `scripts/health-check.sh` afterwards. Not tested by restarting Docker Desktop
 itself, because that would interrupt other containers on this host.
+
+## Identities (Phase 2)
+
+| Task | Command |
+|---|---|
+| Issue / renew a persona cert (24h) | `scripts/issue-user-cert.sh dana lab:developers` |
+| Act as a persona | `KUBECONFIG=.tools/identities/dana.kubeconfig kubectl auth whoami` |
+| Break-glass (platform admin only) | `KUBECONFIG=.tools/identities/alice.kubeconfig kubectl --as=break-glass --as-group=lab:break-glass <cmd>` |
+| Cut off a group immediately | delete its (Cluster)RoleBinding. Certs cannot be revoked; they expire within 24h |
+| Who did what | `docker exec k3d-platform-lab-server-0 cat /var/log/kubernetes/audit/audit.log \| jq -c 'select(.user.username=="alice") \| {verb,uri:.requestURI,imp:.impersonatedUser.username,code:.responseStatus.code}'` |
+
+### "error: You must be logged in to the server (Unauthorized)" as a persona
+The 24h cert has expired. Check: `openssl x509 -in .tools/identities/<user>.crt -noout -enddate`. Re-issue it with the command above.

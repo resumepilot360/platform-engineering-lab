@@ -31,8 +31,9 @@ cilium --context "$KUBE_CONTEXT" status --wait --wait-duration 5m >/dev/null
 log "Waiting for nodes"
 kc wait --for=condition=Ready nodes --all --timeout=180s
 
-log "Applying platform namespaces"
+log "Applying platform namespaces and RBAC"
 kc apply -k "$LAB_ROOT/platform/namespaces"
+kc apply -k "$LAB_ROOT/platform/rbac"
 
 log "Waiting for core add-ons"
 for d in coredns metrics-server local-path-provisioner; do

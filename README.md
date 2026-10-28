@@ -10,7 +10,7 @@ on Apple Silicon, as groundwork for an AWS (EKS + Terraform) equivalent.
 |---|---|---|
 | 0 | Environment discovery | Done — [report](docs/phase-0-diagnostic-report.md) |
 | 1 | Local foundation (k3d, Cilium, Traefik, registry, storage, metrics, namespaces) | Done — see `reports/phase1-acceptance.log` |
-| 2 | IAM / RBAC / audit | Not started |
+| 2 | IAM / RBAC / audit | Done — [IAM model](docs/iam-model.md), `reports/phase2-acceptance.log` |
 | 3 | Secrets | Not started |
 | 4 | GitOps (Argo CD + GitHub Actions) | Not started |
 | 5 | DevSecOps and policy | Not started |
@@ -23,6 +23,8 @@ on Apple Silicon, as groundwork for an AWS (EKS + Terraform) equivalent.
 scripts/install-tools.sh      # pinned kubectl into .tools/bin + brew tools
 scripts/cluster-up.sh         # registry + cluster + Cilium + namespaces + health check
 tests/phase1/acceptance.sh    # Phase 1 acceptance tests
+tests/phase2/acceptance.sh    # Phase 2: issues 24h persona certs, RBAC + audit tests
+KUBECONFIG=.tools/identities/dana.kubeconfig kubectl auth whoami   # act as a persona
 export PATH=$PWD/.tools/bin:$PATH
 kubectl --context k3d-platform-lab get nodes
 curl http://smoke.lab.localhost:8081/
