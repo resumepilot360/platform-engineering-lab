@@ -32,7 +32,8 @@ from diagrams.onprem.vcs import Github
 # label, so larger fonts no longer overlap the icon.
 _node_init = diagrams.Node.__init__
 def _padded_init(self, label="", *args, **kwargs):
-    _node_init(self, "\n" + label if label else label, *args, **kwargs)
+    pad = "\n" * (label.count("\n") + 1)   # multi-line labels need proportionally more room
+    _node_init(self, pad + label if label else label, *args, **kwargs)
 diagrams.Node.__init__ = _padded_init
 
 OUT = Path(__file__).resolve().parent.parent / "images" / "aws"
@@ -62,64 +63,69 @@ FLOW = lambda label, color="#3b4a5a", style="solid": Edge(
 ORANGE, BLUE, GREEN, RED, PURPLE = "#d45b07", "#147eba", "#3f8624", "#c7131f", "#7b3fbf"
 
 
-def diagram(name, title, direction="LR"):
-    return Diagram(title, filename=str(OUT / name), outformat="png", show=False,
-                   direction=direction, graph_attr=GRAPH, node_attr=NODE, edge_attr=EDGE)
+def diagram(name, title, direction="LR", graph=None, node=None):
+    return Diagram(title, filename=str(OUT / name), outformat="png", show=False, direction=direction,
+                   graph_attr={**GRAPH, **(graph or {})}, node_attr={**NODE, **(node or {})}, edge_attr=EDGE)
 
 
 # 1. Overview -----------------------------------------------------------------
-with diagram("aws-overview", "Platform Lab on AWS: EKS architecture (design)"):
-    users = Users("Internet users")
-    engineer = Users("Engineers")
+# Compact top-to-bottom layout: GitHub embeds images at page width, so the
+# canvas must stay small for large fonts to remain legible after scaling.
+BIG = lambda bg, border: {**CLUSTER(bg, border), "fontsize": "34", "margin": "18"}
+BIGFLOW = lambda label, color="#3b4a5a", style="solid": Edge(
+    label=f" {label} " if label else "", color=color, fontcolor=color, style=style,
+    penwidth="4", fontsize="30", fontname="Helvetica Bold")
+with diagram("aws-overview", "Platform Lab on AWS: components (design)", direction="TB",
+             graph={"fontsize": "48", "nodesep": "1.5", "ranksep": "0.9", "pad": "0.4", "dpi": "96"},
+             node={"fontsize": "30", "fontname": "Helvetica Bold"}):
+    with Cluster("GitHub", graph_attr=BIG("#f6f8fa", "#24292f")):
+        repo = Github("Git repo")
+        actions = GithubActions("Actions")
+    users = Users("Users")
+    engineers = Users("Engineers")
 
-    with Cluster("GitHub", graph_attr=GITHUB):
-        repo = Github("platform-engineering-lab\n(source of truth)")
-        actions = GithubActions("Actions\nci · promote · terraform")
+    with Cluster("AWS account · us-east-1", graph_attr=BIG("#f7f9fa", "#232f3e")):
+        with Cluster("Edge", graph_attr=BIG("#ffffff", "#8c4fff")):
+            dns = Route53("Route 53")
+            waf = WAF("WAF")
+            cert = ACM("ACM")
+        with Cluster("Identity", graph_attr=BIG("#ffffff", "#dd344c")):
+            sso = SingleSignOn("Identity\nCenter")
+            sts = IAMAWSSts("STS (OIDC)")
+            roles = IAMRole("IAM roles")
 
-    with Cluster("AWS account (dev / staging)  ·  us-east-1", graph_attr=AWS_CLOUD):
-        sso = SingleSignOn("IAM Identity Center\n(SSO + MFA)")
-        sts = IAMAWSSts("STS\n(GitHub OIDC)")
-        roles = IAMRole("IAM roles\nadmin · developer · readonly\nci-ecr-push · tf-plan · tf-apply")
-        dns = Route53("Route 53")
-        cert = ACM("ACM certificate")
-        waf = WAF("WAF")
-        ecr = ECR("ECR\nsigned images")
-        secrets = SecretsManager("Secrets Manager")
-        kms = KMS("KMS keys")
-        logs = Cloudwatch("CloudWatch\nlogs + metrics")
-        trail = Cloudtrail("CloudTrail")
-        guard = Guardduty("GuardDuty\nEKS runtime")
-        state = S3("S3 Terraform state\n(versioned, locked)")
+        with Cluster("VPC · 3 AZs", graph_attr=BIG("#f2f8ea", "#7aa116")):
+            alb = ALB("ALB")
+            nat = NATGateway("NAT")
+            with Cluster("Amazon EKS (private subnets)", graph_attr=BIG("#fdf1e6", "#ed7100")):
+                argo = ArgoCD("Argo CD")
+                app = Pod("Demo apps")
+                eso = Pod("External\nSecrets")
+                nodes = EC2("Graviton\nnodes")
+            vpce = Endpoint("VPC\nendpoints")
 
-        with Cluster("VPC 10.20.0.0/16  ·  3 Availability Zones", graph_attr=VPC_STYLE):
-            with Cluster("Public subnets", graph_attr=PUBLIC):
-                alb = ALB("Application\nLoad Balancer")
-                nat = NATGateway("NAT gateway")
-            with Cluster("Private subnets", graph_attr=PRIVATE):
-                endpoints = Endpoint("VPC endpoints\nECR · S3 · STS · Secrets\nKMS · Logs · EKS Auth")
-                with Cluster("Amazon EKS 1.35", graph_attr=EKS_STYLE):
-                    eks = EKS("EKS control plane\n(AWS managed)")
-                    nodes = EC2("Managed node group\nGraviton (arm64)")
-                    argo = ArgoCD("Argo CD")
-                    app = Pod("demo-frontend\n→ demo-backend")
-                    eso = Pod("External Secrets\n(Pod Identity)")
-                    volumes = EBS("EBS gp3\n(encrypted)")
+        with Cluster("Images, secrets, keys", graph_attr=BIG("#ffffff", "#147eba")):
+            ecr = ECR("ECR")
+            sm = SecretsManager("Secrets\nManager")
+            kms = KMS("KMS")
+            s3 = S3("Terraform\nstate (S3)")
+        with Cluster("Logging and detection", graph_attr=BIG("#ffffff", "#e7157b")):
+            cw = Cloudwatch("CloudWatch")
+            ct = Cloudtrail("CloudTrail")
+            gd = Guardduty("GuardDuty")
 
-    users >> FLOW("HTTPS", GREEN) >> dns >> waf >> alb >> FLOW("", GREEN) >> app
-    cert >> FLOW("TLS", GREEN, "dashed") >> alb
-    engineer >> FLOW("SSO", BLUE) >> sso >> roles >> FLOW("EKS access entry", BLUE) >> eks
-    actions >> FLOW("OIDC token", BLUE) >> sts >> roles
-    actions >> FLOW("push signed image", ORANGE) >> ecr
-    actions >> FLOW("plan / apply", PURPLE) >> state
-    repo >> FLOW("GitOps pull", ORANGE) >> argo >> FLOW("sync", ORANGE) >> app
-    nodes >> FLOW("image pull", ORANGE) >> endpoints >> ecr
-    eso >> FLOW("GetSecretValue", RED) >> endpoints >> secrets
-    secrets >> FLOW("encrypted by", RED, "dashed") >> kms
-    eks >> FLOW("control-plane logs", "#555555", "dashed") >> logs
-    nodes >> FLOW("egress", "#555555", "dashed") >> nat
-    app >> FLOW("", "#555555", "dotted") >> volumes
-    eks - Edge(style="invis") - nodes
-    trail - Edge(style="invis") - guard
+    users >> BIGFLOW("HTTPS", GREEN) >> dns >> waf >> alb >> BIGFLOW("", GREEN) >> app
+    cert >> BIGFLOW("", GREEN, "dashed") >> alb
+    engineers >> BIGFLOW("SSO", BLUE) >> sso >> roles
+    actions >> BIGFLOW("OIDC", BLUE) >> sts >> roles
+    roles >> BIGFLOW("access entry", BLUE) >> argo
+    repo >> BIGFLOW("GitOps", ORANGE) >> argo >> BIGFLOW("sync", ORANGE) >> app
+    actions >> BIGFLOW("push", ORANGE) >> ecr
+    nodes >> BIGFLOW("", "#555555", "dashed") >> vpce >> BIGFLOW("pull", ORANGE) >> ecr
+    eso >> BIGFLOW("secrets", RED) >> vpce >> BIGFLOW("", RED) >> sm >> BIGFLOW("", RED, "dashed") >> kms
+    nodes >> BIGFLOW("", "#555555", "dashed") >> nat
+    vpce >> BIGFLOW("logs", "#555555", "dashed") >> cw
+    ct - Edge(style="invis") - gd
 
 
 # 2. Network ------------------------------------------------------------------
