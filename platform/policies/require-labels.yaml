@@ -1,0 +1,39 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+  annotations:
+    policies.kyverno.io/title: Require ownership metadata
+    policies.kyverno.io/category: Governance
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Workloads must say what they are and what they belong to; namespaces must declare their environment.
+spec:
+  background: true
+  rules:
+    - name: workload-labels
+      match:
+        any:
+          - resources: {kinds: [Pod], namespaces: [demo-dev, demo-staging, demo-prod]}
+      validate:
+        failureAction: Audit
+        message: "Pods need labels app.kubernetes.io/name and app.kubernetes.io/part-of."
+        pattern:
+          metadata:
+            labels:
+              app.kubernetes.io/name: "?*"
+              app.kubernetes.io/part-of: "?*"
+    - name: namespace-environment
+      match:
+        any:
+          - resources: {kinds: [Namespace]}
+      exclude:
+        any:
+          - resources: {names: [default, kube-system, kube-public, kube-node-lease]}
+      validate:
+        failureAction: Audit
+        message: "Namespaces need the label lab.platform/environment."
+        pattern:
+          metadata:
+            labels:
+              lab.platform/environment: "?*"

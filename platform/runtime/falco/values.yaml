@@ -1,0 +1,32 @@
+# Falco Helm values (chart pinned in local/versions.env). Runtime threat
+# DETECTION only (no blocking). modern_ebpf driver: CO-RE probe, no kernel
+# module; verified kernel 6.10 + BTF on Docker Desktop.
+driver:
+  kind: modern_ebpf
+  modernEbpf:
+    leastPrivileged: true         # capabilities (BPF, PERFMON, SYS_RESOURCE, SYS_PTRACE), not privileged: true
+tty: true
+falcosidekick:
+  enabled: false                  # alerts go to stdout (JSON) → Loki in Phase 7
+falco:
+  json_output: true
+  json_include_output_property: true
+  priority: notice
+  # Lab-specific tuning lives in customRules below; default ruleset stays on.
+resources:
+  requests: {cpu: 50m, memory: 128Mi}
+  limits: {memory: 512Mi}
+customRules:
+  lab-rules.yaml: |-
+    # Any interactive shell in an application namespace is suspicious: the demo
+    # images are distroless (no shell), so a shell means something unexpected.
+    - rule: Shell in lab application container
+      desc: A shell process started in a demo-* or lab-* container
+      condition: >
+        spawned_process and container and proc.name in (shell_binaries)
+        and k8s.ns.name startswith "demo-"
+      output: >
+        Shell in application container (user=%user.name ns=%k8s.ns.name
+        pod=%k8s.pod.name container=%container.name cmdline=%proc.cmdline image=%container.image.repository)
+      priority: WARNING
+      tags: [lab, container, shell, mitre_execution]

@@ -1,0 +1,28 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Restrict image registries
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Application and lab workloads may only use images from this repository's GHCR namespace or the local approved registry.
+spec:
+  background: true
+  rules:
+    - name: approved-registries
+      match:
+        any:
+          - resources: {kinds: [Pod], namespaces: [demo-dev, demo-staging, demo-prod, lab-smoke, lab-portal]}
+      validate:
+        failureAction: Audit
+        message: "Image {{ request.object.spec.containers[0].image }} is not from an approved registry (ghcr.io/resumepilot360/* or k3d-registry.localhost:5001/*)."
+        pattern:
+          spec:
+            =(ephemeralContainers):
+              - image: "ghcr.io/resumepilot360/* | k3d-registry.localhost:5001/*"
+            =(initContainers):
+              - image: "ghcr.io/resumepilot360/* | k3d-registry.localhost:5001/*"
+            containers:
+              - image: "ghcr.io/resumepilot360/* | k3d-registry.localhost:5001/*"

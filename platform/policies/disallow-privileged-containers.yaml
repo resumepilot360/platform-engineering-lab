@@ -1,0 +1,34 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged-containers
+  annotations:
+    policies.kyverno.io/title: Disallow privileged containers
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Privileged containers have full host access. Defence in depth with Pod Security Admission, and covers namespaces PSA does not restrict.
+spec:
+  background: true
+  rules:
+    - name: no-privileged
+      match:
+        any:
+          - resources: {kinds: [Pod]}
+      exclude:
+        any:
+          - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
+      validate:
+        failureAction: Audit
+        message: "Privileged containers are not allowed (securityContext.privileged must be false or unset)."
+        pattern:
+          spec:
+            =(ephemeralContainers):
+              - =(securityContext):
+                  =(privileged): "false"
+            =(initContainers):
+              - =(securityContext):
+                  =(privileged): "false"
+            containers:
+              - =(securityContext):
+                  =(privileged): "false"

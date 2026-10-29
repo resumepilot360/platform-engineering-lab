@@ -1,0 +1,30 @@
+# Kyverno Helm values (chart pinned in local/versions.env). Installed by the
+# bootstrap; policies themselves live in platform/policies and are owned by Argo CD.
+admissionController:
+  replicas: 1                     # lab: single replica (production: 3)
+  container:
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {memory: 384Mi}
+backgroundController:
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 192Mi}
+reportsController:
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 192Mi}
+cleanupController:
+  enabled: false                  # no ClusterCleanupPolicies; saves ~100 MiB
+config:
+  webhooks:
+    # Never intercept the components Kyverno itself depends on.
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kyverno]
+features:
+  policyExceptions:
+    enabled: true
+    namespace: kyverno            # exceptions may only be created here (platform-owned)

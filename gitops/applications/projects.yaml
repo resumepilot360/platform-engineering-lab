@@ -17,6 +17,7 @@ spec:
     - {group: "", kind: Namespace}
     - {group: rbac.authorization.k8s.io, kind: ClusterRole}
     - {group: rbac.authorization.k8s.io, kind: ClusterRoleBinding}
+    - {group: kyverno.io, kind: ClusterPolicy}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

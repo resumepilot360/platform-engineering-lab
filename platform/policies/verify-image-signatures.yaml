@@ -1,0 +1,45 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Verify image signatures and SBOM
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/severity: critical
+    policies.kyverno.io/description: >-
+      Images from ghcr.io/resumepilot360 must be signed (Cosign keyless) by this repository's ci.yaml on main and carry a signed CycloneDX SBOM attestation.
+spec:
+  background: true
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: signed-by-ci-on-main
+      match:
+        any:
+          - resources: {kinds: [Pod], namespaces: [demo-dev, demo-staging, demo-prod]}
+      verifyImages:
+        - imageReferences: ["ghcr.io/resumepilot360/*"]
+          failureAction: Audit
+          mutateDigest: false        # digests are already pinned in Git
+          verifyDigest: true
+          required: true
+          attestors:
+            - entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: https://github.com/resumepilot360/platform-engineering-lab/.github/workflows/ci.yaml@refs/heads/main
+                    rekor:
+                      url: https://rekor.sigstore.dev
+          attestations:
+            - type: https://cyclonedx.org/bom
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: https://github.com/resumepilot360/platform-engineering-lab/.github/workflows/ci.yaml@refs/heads/main
+                        rekor:
+                          url: https://rekor.sigstore.dev
+              conditions:
+                - all:
+                    - key: "{{ bomFormat }}"
+                      operator: Equals
+                      value: CycloneDX

@@ -1,0 +1,46 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-host-namespaces
+  annotations:
+    policies.kyverno.io/title: Disallow host namespaces and ports
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Host network, PID and IPC namespaces and hostPorts expose the node to the workload.
+spec:
+  background: true
+  rules:
+    - name: no-host-namespaces
+      match:
+        any:
+          - resources: {kinds: [Pod]}
+      exclude:
+        any:
+          - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
+      validate:
+        failureAction: Audit
+        message: "hostNetwork, hostPID and hostIPC must be false or unset."
+        pattern:
+          spec:
+            =(hostNetwork): "false"
+            =(hostPID): "false"
+            =(hostIPC): "false"
+    - name: no-host-ports
+      match:
+        any:
+          - resources: {kinds: [Pod]}
+      exclude:
+        any:
+          - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
+      validate:
+        failureAction: Audit
+        message: "hostPort is not allowed."
+        pattern:
+          spec:
+            =(initContainers):
+              - =(ports):
+                  - =(hostPort): 0
+            containers:
+              - =(ports):
+                  - =(hostPort): 0

@@ -56,6 +56,15 @@ hc upgrade --install openbao openbao/openbao --version "$OPENBAO_CHART_VERSION" 
   --namespace openbao -f "$LAB_ROOT/platform/secrets/openbao/values.yaml"
 "$LAB_ROOT/scripts/openbao-bootstrap.sh"
 
+log "Installing Kyverno $KYVERNO_CHART_VERSION and Falco $FALCO_CHART_VERSION"
+helm repo add kyverno https://kyverno.github.io/kyverno >/dev/null 2>&1 || true
+helm repo add falcosecurity https://falcosecurity.github.io/charts >/dev/null 2>&1 || true
+helm repo update kyverno falcosecurity >/dev/null
+hc upgrade --install kyverno kyverno/kyverno --version "$KYVERNO_CHART_VERSION" \
+  --namespace kyverno -f "$LAB_ROOT/platform/policies/kyverno/values.yaml" --wait --timeout 15m
+hc upgrade --install falco falcosecurity/falco --version "$FALCO_CHART_VERSION" \
+  --namespace falco -f "$LAB_ROOT/platform/runtime/falco/values.yaml" --wait --timeout 15m
+
 # From here on, Argo CD owns all platform config and apps (ADR-0009).
 log "Installing Argo CD $ARGOCD_CHART_VERSION"
 helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
