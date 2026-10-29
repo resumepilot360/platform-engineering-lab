@@ -18,13 +18,15 @@ resources:
   limits: {memory: 512Mi}
 customRules:
   lab-rules.yaml: |-
-    # Any interactive shell in an application namespace is suspicious: the demo
-    # images are distroless (no shell), so a shell means something unexpected.
+    # Any shell in an application namespace is suspicious: the demo images are
+    # distroless (no shell), so a shell means something unexpected. Exception:
+    # Argo CD PostSync smoke-test hook pods (busybox, run on every sync).
     - rule: Shell in lab application container
       desc: A shell process started in a demo-* or lab-* container
       condition: >
         spawned_process and container and proc.name in (shell_binaries)
         and k8s.ns.name startswith "demo-"
+        and not k8s.pod.name startswith "smoke-test-"
       output: >
         Shell in application container (user=%user.name ns=%k8s.ns.name
         pod=%k8s.pod.name container=%container.name cmdline=%proc.cmdline image=%container.image.repository)
