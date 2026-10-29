@@ -12,7 +12,7 @@ on Apple Silicon, as groundwork for an AWS (EKS + Terraform) equivalent.
 | 1 | Local foundation (k3d, Cilium, Traefik, registry, storage, metrics, namespaces) | Done — see `reports/phase1-acceptance.log` |
 | 2 | IAM / RBAC / audit | Done — [IAM model](docs/iam-model.md), `reports/phase2-acceptance.log` |
 | 3 | Secrets (OpenBao + External Secrets, encryption at rest) | Done — [secrets model](docs/secrets-model.md), `reports/phase3-acceptance.log` |
-| 4 | GitOps (Argo CD + GitHub Actions) | Not started |
+| 4 | GitOps (Argo CD + GitHub Actions, dev → staging → prod) | Done — [ADR-0009](docs/decisions/0009-gitops-ownership.md), [delivery runbook](docs/runbooks/gitops-delivery.md), `reports/phase4-acceptance.log` |
 | 5 | DevSecOps and policy | Not started |
 | 6 | Network security | Not started |
 | 7 | Observability and incident response | Not started |
@@ -25,6 +25,8 @@ scripts/cluster-up.sh         # registry + cluster + Cilium + namespaces + healt
 tests/phase1/acceptance.sh    # Phase 1 acceptance tests
 tests/phase2/acceptance.sh    # Phase 2: issues 24h persona certs, RBAC + audit tests
 tests/phase3/acceptance.sh    # Phase 3: encryption at rest, OpenBao, ESO, rotation, leak checks
+tests/phase4/acceptance.sh    # Phase 4: Argo CD, delivery to 3 envs, guardrails, drift
+gh workflow run promote -f to=staging   # promote dev digests (opens a PR)
 scripts/openbao-bootstrap.sh --unseal   # after any restart of the cluster or OpenBao pod
 KUBECONFIG=.tools/identities/dana.kubeconfig kubectl auth whoami   # act as a persona
 export PATH=$PWD/.tools/bin:$PATH

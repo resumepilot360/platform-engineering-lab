@@ -47,6 +47,17 @@ Consequences:
 - Namespaces carry `argocd.argoproj.io/sync-options: Delete=false`, so removing one from Git can't cascade-delete it.
 
 ## Known gaps
+- **Shared bases and components bypass promotion.** Only image digests are
+  promoted per environment. A change to `applications/*/deploy/base` or
+  `gitops/components/*` changes the rendered manifests of **all** environments
+  at once. dev and staging auto-sync it, and prod goes OutOfSync, so it is
+  still held by the manual sync, but without a promotion PR. Found during
+  Phase 4 when a hook-TTL fix would have touched prod directly. Production
+  alternatives: per-environment pinned base refs (`?ref=<tag>` remote bases),
+  rendered-manifest promotion, or Kargo-style freight promotion.
+- **Hook evidence expires** (`ttlSecondsAfterFinished: 3600`), and self-heal syncs
+  don't run hooks. Verification history therefore lives in Argo CD's operation
+  state and in logs (Phase 7), not in Job objects.
 - **No SSO.** Argo CD RBAC maps `lab:*` groups, but only the local `admin` account
   exists until an OIDC provider supplies groups (Dex/OIDC, deferred with Phase 2b).
   Using `admin` daily is the local compromise.
