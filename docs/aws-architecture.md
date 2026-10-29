@@ -13,7 +13,7 @@ secrets and keys, ingress, and logging.
 
 ## 1. Components
 
-<a href="images/aws/aws-overview.png"><img src="images/aws/aws-overview.png" alt="AWS overview: GitHub, Identity Center, VPC, EKS, ECR, Secrets Manager, KMS, CloudWatch" width="100%"></a>
+<p align="center"><a href="images/aws/aws-overview.png"><img src="images/aws/aws-overview.png" alt="AWS overview: GitHub, Identity Center, VPC, EKS, ECR, Secrets Manager, KMS, CloudWatch" width="70%"></a></p>
 
 ## 2. Network and routing
 

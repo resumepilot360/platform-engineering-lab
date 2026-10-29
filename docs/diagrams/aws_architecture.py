@@ -9,8 +9,7 @@ Writes PNGs to docs/images/aws/. Design only; see docs/aws-architecture.md.
 """
 from pathlib import Path
 
-import diagrams
-from diagrams import Cluster, Diagram, Edge
+from diagrams import Cluster, Edge
 from diagrams.aws.compute import EC2, ECR, EKS, Lambda
 from diagrams.aws.general import Users
 from diagrams.aws.management import Cloudtrail, Cloudwatch
@@ -27,57 +26,32 @@ from diagrams.onprem.gitops import ArgoCD
 from diagrams.onprem.iac import Terraform
 from diagrams.onprem.vcs import Github
 
-# diagrams sizes each node from its label's line count (explicit `height` is
-# overridden). A leading blank line buys one line of space between icon and
-# label, so larger fonts no longer overlap the icon.
-_node_init = diagrams.Node.__init__
-def _padded_init(self, label="", *args, **kwargs):
-    pad = "\n" * (label.count("\n") + 1)   # multi-line labels need proportionally more room
-    _node_init(self, pad + label if label else label, *args, **kwargs)
-diagrams.Node.__init__ = _padded_init
+import importlib.util
+
+_spec = importlib.util.spec_from_file_location("_style", Path(__file__).with_name("_style.py"))
+_style = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_style)
+from functools import partial
+CLUSTER, FLOW, GREEN, BLUE, ORANGE, RED, PURPLE = (_style.CLUSTER, _style.FLOW, _style.GREEN,
+                                                    _style.BLUE, _style.ORANGE, _style.RED, _style.PURPLE)
+AWS_CLOUD, REGION, VPC_STYLE, PUBLIC, PRIVATE, EKS_STYLE, NEUTRAL, GITHUB = (
+    _style.AWS_CLOUD, _style.REGION, _style.VPC_STYLE, _style.PUBLIC, _style.PRIVATE,
+    _style.EKS_STYLE, _style.NEUTRAL, _style.GITHUB)
 
 OUT = Path(__file__).resolve().parent.parent / "images" / "aws"
 OUT.mkdir(parents=True, exist_ok=True)
-
-# Large, high-contrast styling: readable in GitHub light and dark mode.
-# Curved splines keep edge labels on their edges (orthogonal routing scatters them).
-GRAPH = {"fontsize": "40", "fontname": "Helvetica Bold", "bgcolor": "white", "pad": "0.6",
-         "nodesep": "1.0", "ranksep": "1.4", "dpi": "110", "labelloc": "t", "splines": "spline"}
-NODE = {"fontsize": "22", "fontname": "Helvetica", "fontcolor": "#16191f"}
-EDGE = {"fontsize": "24", "fontname": "Helvetica Bold", "fontcolor": "#16191f", "penwidth": "2.6", "color": "#3b4a5a"}
-CLUSTER = lambda bg, border: {"fontsize": "28", "fontname": "Helvetica Bold", "bgcolor": bg,
-                              "pencolor": border, "penwidth": "2.5", "margin": "24", "style": "rounded"}
-
-AWS_CLOUD = CLUSTER("#f7f9fa", "#232f3e")
-REGION = CLUSTER("#ffffff", "#147eba")
-VPC_STYLE = CLUSTER("#f2f8ea", "#7aa116")
-PUBLIC = CLUSTER("#e9f3e6", "#7aa116")
-PRIVATE = CLUSTER("#e6f2f8", "#147eba")
-EKS_STYLE = CLUSTER("#fdf1e6", "#ed7100")
-NEUTRAL = CLUSTER("#f4f4f4", "#8c8c8c")
-GITHUB = CLUSTER("#f6f8fa", "#24292f")
-
-FLOW = lambda label, color="#3b4a5a", style="solid": Edge(
-    label=f"  {label}  " if label else "", color=color, fontcolor=color, style=style, penwidth="3",
-    fontsize="24", fontname="Helvetica Bold")
-ORANGE, BLUE, GREEN, RED, PURPLE = "#d45b07", "#147eba", "#3f8624", "#c7131f", "#7b3fbf"
-
-
-def diagram(name, title, direction="LR", graph=None, node=None):
-    return Diagram(title, filename=str(OUT / name), outformat="png", show=False, direction=direction,
-                   graph_attr={**GRAPH, **(graph or {})}, node_attr={**NODE, **(node or {})}, edge_attr=EDGE)
+diagram = partial(_style.diagram, OUT)
 
 
 # 1. Overview -----------------------------------------------------------------
 # Compact top-to-bottom layout: GitHub embeds images at page width, so the
 # canvas must stay small for large fonts to remain legible after scaling.
-BIG = lambda bg, border: {**CLUSTER(bg, border), "fontsize": "34", "margin": "18"}
+BIG = lambda bg, border: {**CLUSTER(bg, border), "fontsize": "30", "margin": "18"}
 BIGFLOW = lambda label, color="#3b4a5a", style="solid": Edge(
     label=f" {label} " if label else "", color=color, fontcolor=color, style=style,
-    penwidth="4", fontsize="30", fontname="Helvetica Bold")
+    penwidth="3.5", fontsize="26", fontname="Helvetica Bold")
 with diagram("aws-overview", "Platform Lab on AWS: components (design)", direction="TB",
              graph={"fontsize": "48", "nodesep": "1.5", "ranksep": "0.9", "pad": "0.4", "dpi": "96"},
-             node={"fontsize": "30", "fontname": "Helvetica Bold"}):
+             node={"fontsize": "26", "fontname": "Helvetica Bold"}):
     with Cluster("GitHub", graph_attr=BIG("#f6f8fa", "#24292f")):
         repo = Github("Git repo")
         actions = GithubActions("Actions")
