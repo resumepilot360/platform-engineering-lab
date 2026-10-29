@@ -1,0 +1,153 @@
+# Terraform CI: static checks always; plan/apply ONLY when the AWS phase is
+# approved and the role ARNs are set as repository variables:
+#   AWS_ACCOUNT_ID, AWS_TF_PLAN_ROLE_ARN, AWS_TF_APPLY_ROLE_ARN, TF_STATE_BUCKET
+# Until then the plan/apply jobs are skipped and no AWS call is ever made.
+#
+# Apply is manual (workflow_dispatch), runs in the `production` environment
+# (required reviewer), and applies the exact plan file produced in the same
+# run after a human has reviewed it.
+name: terraform
+on:
+  pull_request:
+    paths: ["terraform/**", ".github/workflows/terraform.yaml"]
+  push:
+    branches: [main]
+    paths: ["terraform/**", ".github/workflows/terraform.yaml"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Terraform environment root
+        type: choice
+        options: [dev, staging]
+        required: true
+      apply:
+        description: Apply the reviewed plan (requires production approval)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.17.1"
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  static:
+    name: fmt · validate · trivy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - name: terraform fmt
+        run: terraform -chdir=terraform fmt -check -recursive -diff
+      - name: terraform validate (no backend, no AWS calls)
+        run: |
+          for root in bootstrap environments/dev environments/staging; do
+            echo "::group::$root"
+            terraform -chdir=terraform/$root init -backend=false -input=false
+            terraform -chdir=terraform/$root validate
+            echo "::endgroup::"
+          done
+      - name: Trivy misconfiguration scan (fail on MEDIUM+, justified exceptions in terraform/.trivyignore.yaml)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          version: v0.76.1
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: terraform/.trivyignore.yaml
+
+  plan:
+    name: plan (${{ matrix.environment }})
+    needs: static
+    # Disabled until the AWS phase is approved and roles exist.
+    if: vars.AWS_TF_PLAN_ROLE_ARN != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write          # GitHub OIDC → tf-plan role (read-only)
+      pull-requests: write     # post the plan summary
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.environment)) || fromJSON('["dev","staging"]') }}
+    defaults:
+      run:
+        working-directory: terraform/environments/${{ matrix.environment }}
+    env:
+      TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_TF_PLAN_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: tf-plan-${{ github.run_id }}
+      - name: init
+        env:
+          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: terraform init -input=false -backend-config="bucket=$STATE_BUCKET"
+      - name: plan
+        run: |
+          terraform plan -input=false -lock-timeout=5m -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+          { echo '### Terraform plan'; echo '```'; tail -c 60000 plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload plan for review/apply
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: terraform/environments/${{ matrix.environment }}/tfplan
+          retention-days: 5
+
+  apply:
+    name: apply (${{ inputs.environment }})
+    needs: plan
+    if: github.event_name == 'workflow_dispatch' && inputs.apply && vars.AWS_TF_APPLY_ROLE_ARN != ''
+    runs-on: ubuntu-24.04
+    environment: production            # required reviewer approves after reading the plan
+    concurrency:
+      group: terraform-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: terraform/environments/${{ inputs.environment }}
+    env:
+      TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_TF_APPLY_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: tf-apply-${{ github.run_id }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tfplan-${{ inputs.environment }}
+          path: terraform/environments/${{ inputs.environment }}
+      - name: init
+        env:
+          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: terraform init -input=false -backend-config="bucket=$STATE_BUCKET"
+      - name: apply the reviewed plan (fails if state changed since plan)
+        run: terraform apply -input=false -lock-timeout=5m tfplan

@@ -13,10 +13,10 @@ on Apple Silicon, as groundwork for an AWS (EKS + Terraform) equivalent.
 | 2 | IAM / RBAC / audit | Done — [IAM model](docs/iam-model.md), `reports/phase2-acceptance.log` |
 | 3 | Secrets (OpenBao + External Secrets, encryption at rest) | Done — [secrets model](docs/secrets-model.md), `reports/phase3-acceptance.log` |
 | 4 | GitOps (Argo CD + GitHub Actions, dev → staging → prod) | Done — [ADR-0009](docs/decisions/0009-gitops-ownership.md), [delivery runbook](docs/runbooks/gitops-delivery.md), `reports/phase4-acceptance.log` |
-| 5 | DevSecOps and policy | Not started |
+| 5 | DevSecOps and policy | In progress — [tool evaluation](docs/phase-5-tool-evaluation.md) |
 | 6 | Network security | Not started |
 | 7 | Observability and incident response | Not started |
-| 8 | Terraform / AWS design | Not started |
+| 8 | Terraform / AWS design | Modules written + validated, **not deployed** — [terraform/](terraform/README.md), [AWS architecture](docs/aws-architecture.md) |
 
 ## Quick start
 ```bash

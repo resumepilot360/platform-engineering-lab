@@ -1,0 +1,10 @@
+# Accepted Trivy findings for the Terraform code. Each entry carries a reason
+# and is scoped to one file. Review on every change to that file.
+misconfigurations:
+  - id: AWS-0342
+    paths: ["modules/github-oidc/main.tf"]
+    statement: >-
+      tf-apply must pass roles to EKS (cluster/node roles), VPC flow logs and Pod
+      Identity. iam:PassRole is limited to roles under /platform-lab/ AND, via
+      iam:PassedToService, to eks, ec2, vpc-flow-logs and pods.eks only. Those
+      roles can only be created with the workload permissions boundary.
