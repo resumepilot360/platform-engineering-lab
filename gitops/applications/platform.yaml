@@ -85,7 +85,11 @@ kind: Application
 metadata:
   name: platform-policies
   namespace: argocd
-  annotations: {argocd.argoproj.io/sync-wave: "-1"}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # Diff against a server-side dry-run (through Kyverno's defaulting webhook),
+    # so webhook-added defaults are not reported as drift; real drift still is.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers: [resources-finalizer.argocd.argoproj.io]
 spec:
   project: platform
