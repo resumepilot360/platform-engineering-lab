@@ -3,7 +3,8 @@
 Local, production-inspired platform on k3d (Apple Silicon), with GitHub as the
 source of truth and an AWS/EKS design to follow in Phase 8. Versions are pinned
 in [`local/versions.env`](../local/versions.env). Every endpoint is linked from
-the lab portal, **http://lab.localhost:8081**.
+the lab portal, **http://lab.localhost:8081**. The AWS/EKS target design is in
+[aws-architecture.md](aws-architecture.md).
 
 ## 1. Components
 
