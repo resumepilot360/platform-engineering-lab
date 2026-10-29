@@ -25,6 +25,12 @@ config:
           operator: NotIn
           values: [kube-system, kyverno]
 features:
+  # Fetch the current Sigstore trust root (Fulcio/Rekor) via TUF instead of the
+  # root embedded at build time; without it, current Fulcio certificates fail
+  # with "x509: certificate signed by unknown authority".
+  tuf:
+    enabled: true
+    mirror: https://tuf-repo-cdn.sigstore.dev
   policyExceptions:
     enabled: true
     namespace: kyverno            # exceptions may only be created here (platform-owned)

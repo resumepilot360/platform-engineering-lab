@@ -29,7 +29,8 @@ spec:
           - resources: {kinds: [Namespace]}
       exclude:
         any:
-          - resources: {names: [default, kube-system, kube-public, kube-node-lease]}
+          # System namespaces created by Kubernetes/K3s and by Cilium itself.
+          - resources: {names: [default, kube-system, kube-public, kube-node-lease, cilium-secrets]}
       validate:
         failureAction: Audit
         message: "Namespaces need the label lab.platform/environment."
