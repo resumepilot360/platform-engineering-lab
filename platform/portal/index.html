@@ -47,6 +47,8 @@
   .desc { color: var(--muted); font-size: 13px; }
   .sub { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; }
   .sub a { color: var(--accent); text-decoration: none; }
+  a.preview img { display: block; width: 100%; border: 1px solid var(--line); border-radius: 8px;
+                  background: #fff; margin: 4px 0; }
   code.cmd { display: block; background: var(--code-bg); border-radius: 6px; padding: 6px 8px; font-size: 12.5px;
              font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; white-space: pre;
              cursor: copy; position: relative; }
@@ -94,6 +96,7 @@ const SECTIONS = [
               ["Runbooks", "https://github.com/resumepilot360/platform-engineering-lab/tree/main/docs/runbooks"]] },
     { name: "AWS architecture (EKS)", url: "https://github.com/resumepilot360/platform-engineering-lab/blob/main/docs/aws-architecture.md",
       status: "live", tag: "design · Phase 8",
+      img: "https://raw.githubusercontent.com/resumepilot360/platform-engineering-lab/main/docs/images/aws/aws-overview.png",
       desc: "VPC, EKS, identity (Identity Center, access entries, Pod Identity, GitHub OIDC), Secrets Manager + KMS, ALB, Terraform, cost, teardown. Not deployed.",
       links: [["Components", "https://github.com/resumepilot360/platform-engineering-lab/blob/main/docs/aws-architecture.md#1-components"],
               ["Identity", "https://github.com/resumepilot360/platform-engineering-lab/blob/main/docs/aws-architecture.md#3-identity"],
@@ -153,6 +156,11 @@ function render() {
       if (it.url) {
         const a = el("a", "url", it.url); a.href = it.url; a.target = "_blank"; a.rel = "noopener";
         card.append(a);
+      }
+      if (it.img) {
+        const a = el("a", "preview"); a.href = it.url; a.target = "_blank"; a.rel = "noopener";
+        const im = el("img"); im.src = it.img; im.alt = it.name + " diagram"; im.loading = "lazy";
+        a.append(im); card.append(a);
       }
       if (it.desc) card.append(el("div", "desc", it.desc));
       if (it.links) {

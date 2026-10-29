@@ -5,115 +5,19 @@
 > this design in Phase 8, and every `apply` goes through a reviewed plan.
 
 The same platform as the [local lab](architecture.md), mapped to managed AWS services.
+Diagrams use the official AWS architecture icons and are generated from code
+([`docs/diagrams/aws_architecture.py`](diagrams/aws_architecture.py)). Click a diagram for full resolution.
 Kubernetes-level components (Argo CD, External Secrets, Kyverno, and the demo app
 manifests) are **identical**. What changes is identity, networking, storage of
 secrets and keys, ingress, and logging.
 
 ## 1. Components
 
-```mermaid
-flowchart LR
-  subgraph GH["GitHub: resumepilot360/platform-engineering-lab"]
-    direction TB
-    REPO[("Git repo, main<br/>app + platform + terraform/")]
-    ACT["GitHub Actions<br/>ci · promote · terraform-plan · terraform-apply"]
-  end
-
-  subgraph AWS["AWS account per environment (dev, staging) · us-east-1"]
-    direction TB
-    subgraph IDN["Identity"]
-      IDC["IAM Identity Center<br/>SSO users → permission sets"]
-      OIDC["IAM OIDC provider<br/>token.actions.githubusercontent.com"]
-      ROLES["IAM roles<br/>tf-plan · tf-apply · ci-ecr-push<br/>eks-admin · eks-developer · eks-readonly · break-glass"]
-    end
-    subgraph DATA["Regional services (reached via VPC endpoints)"]
-      ECR[("ECR<br/>immutable tags · scan on push<br/>pull-through cache: ghcr/quay/docker")]
-      SM[("Secrets Manager<br/>dev/demo/backend …")]
-      KMS["KMS CMKs<br/>eks-secrets · secrets-ENV · logs · ecr"]
-      CW["CloudWatch Logs + Metrics<br/>EKS control-plane logs · Container Insights"]
-      TFS[("S3 Terraform state<br/>versioned · KMS · native lockfile")]
-    end
-    subgraph EDGE["Edge"]
-      R53["Route 53<br/>demo.dev.example.com"]
-      ACM["ACM certificate"]
-      WAF["AWS WAF (optional)"]
-    end
-    subgraph VPC["VPC 10.20.0.0/16 · 3 AZs"]
-      direction TB
-      ALB["Application Load Balancer<br/>public subnets · HTTPS :443"]
-      NAT["NAT gateway(s)<br/>public subnets"]
-      subgraph EKS["EKS 1.35 (managed control plane, private + restricted public endpoint)"]
-        direction TB
-        NODES["Managed node group<br/>Graviton t4g/m7g · private subnets<br/>Bottlerocket or AL2023"]
-        subgraph ADDONS["EKS add-ons (Terraform-owned)"]
-          VPCCNI["VPC CNI<br/>+ NetworkPolicy agent"]
-          CORE["CoreDNS · kube-proxy"]
-          PIA["Pod Identity agent"]
-          EBS["EBS CSI driver (gp3, KMS)"]
-          LBC["AWS Load Balancer Controller"]
-        end
-        subgraph GITOPS["Argo CD-owned (same manifests as local)"]
-          ACD["Argo CD"]
-          ESO["External Secrets Operator"]
-          KYV["Kyverno"]
-          APP["demo-frontend → demo-backend<br/>namespaces demo-ENV"]
-        end
-      end
-      VPCE["Interface/Gateway endpoints<br/>ECR api+dkr · S3 · STS · Secrets Manager · KMS · Logs · EKS Auth"]
-    end
-    GD["GuardDuty EKS Runtime + Audit monitoring<br/>(managed alternative to Falco)"]
-    CT["CloudTrail (org/account)"]
-  end
-
-  USER(["Engineer"]) -- "SSO login" --> IDC
-  IDC -- "assume role" --> ROLES
-  ROLES -- "EKS access entry" --> EKS
-  INTERNET(["Users"]) --> R53 --> WAF --> ALB
-  ACM -.-> ALB
-  ALB --> APP
-  REPO -- "pull (HTTPS)" --> ACD
-  ACT -- "OIDC → STS" --> OIDC
-  OIDC --> ROLES
-  ACT -- "push signed image" --> ECR
-  ACT -- "terraform plan/apply" --> TFS
-  NODES -- "pull via endpoint" --> ECR
-  ESO -- "Pod Identity → GetSecretValue" --> SM
-  SM -. "envelope encryption" .-> KMS
-  EKS -. "Secret envelope encryption" .-> KMS
-  EKS -- "api, audit, authenticator logs" --> CW
-  NODES --> VPCE
-  NODES -- "egress for non-endpoint traffic" --> NAT
-  LBC -- "provisions" --> ALB
-```
+<a href="images/aws/aws-overview.png"><img src="images/aws/aws-overview.png" alt="AWS overview: GitHub, Identity Center, VPC, EKS, ECR, Secrets Manager, KMS, CloudWatch" width="100%"></a>
 
 ## 2. Network and routing
 
-```mermaid
-flowchart TB
-  IGW["Internet gateway"]
-  subgraph VPC["VPC 10.20.0.0/16"]
-    direction TB
-    subgraph AZA["AZ a"]
-      PUBA["public 10.20.0.0/22<br/>ALB, NAT gw"]
-      PRIA["private 10.20.32.0/19<br/>nodes + pods (VPC CNI IPs)"]
-    end
-    subgraph AZB["AZ b"]
-      PUBB["public 10.20.4.0/22<br/>ALB"]
-      PRIB["private 10.20.64.0/19<br/>nodes + pods"]
-    end
-    subgraph AZC["AZ c"]
-      PUBC["public 10.20.8.0/22<br/>ALB"]
-      PRIC["private 10.20.96.0/19<br/>nodes + pods"]
-    end
-    RTPUB["public route table<br/>0.0.0.0/0 → IGW"]
-    RTPRI["private route tables<br/>0.0.0.0/0 → NAT · S3 prefix → gateway endpoint"]
-    EP["interface endpoints in private subnets<br/>ecr.api · ecr.dkr · sts · secretsmanager · kms · logs · eks-auth"]
-  end
-  IGW --- RTPUB
-  RTPUB --- PUBA & PUBB & PUBC
-  RTPRI --- PRIA & PRIB & PRIC
-  PRIA & PRIB & PRIC --- EP
-```
+<a href="images/aws/aws-network.png"><img src="images/aws/aws-network.png" alt="VPC with public and private subnets across three Availability Zones, route tables and endpoints" width="100%"></a>
 
 | Security group | Inbound | Outbound |
 |---|---|---|
@@ -129,27 +33,7 @@ flowchart TB
 
 ## 3. Identity
 
-```mermaid
-flowchart LR
-  subgraph HUMAN["Humans"]
-    U["Engineer"] --> IDC["IAM Identity Center (MFA)"]
-    IDC --> PS["permission set → IAM role<br/>eks-admin / eks-developer / eks-readonly"]
-    PS --> AE["EKS access entry<br/>kubernetes_groups: lab:platform-admins / lab:developers / lab:auditors"]
-    AE --> RBAC["Kubernetes RBAC<br/>(same ClusterRoles/Roles as local)"]
-    BG["break-glass role<br/>MFA · 2 people · alarmed"] --> AEBG["access entry → AmazonEKSClusterAdminPolicy"]
-  end
-  subgraph CI["GitHub Actions"]
-    GHA["workflow run<br/>OIDC token: repo, ref, environment"] --> STS["sts:AssumeRoleWithWebIdentity<br/>trust: sub = repo:resumepilot360/platform-engineering-lab:…"]
-    STS --> R1["ci-ecr-push<br/>ecr:PutImage on demo-* only"]
-    STS --> R2["tf-plan<br/>ReadOnly + state read"]
-    STS --> R3["tf-apply<br/>environment: production approval"]
-  end
-  subgraph PODS["Workloads"]
-    SA["ServiceAccount external-secrets/external-secrets"] --> PIA["EKS Pod Identity association"]
-    PIA --> RESO["role eso-ENV<br/>secretsmanager:GetSecretValue on ENV/demo/*<br/>kms:Decrypt on secrets-ENV key"]
-    SA2["ServiceAccount kube-system/aws-load-balancer-controller"] --> PIA2["Pod Identity"] --> RLBC["role lbc (AWS-managed policy doc)"]
-  end
-```
+<a href="images/aws/aws-identity.png"><img src="images/aws/aws-identity.png" alt="Identity flows: Identity Center to access entries, GitHub OIDC to STS roles, Pod Identity" width="100%"></a>
 
 | Local lab | AWS |
 |---|---|
@@ -162,65 +46,18 @@ flowchart LR
 
 ## 4. GitOps and supply chain on EKS
 
-```mermaid
-sequenceDiagram
-  autonumber
-  actor Dev as Developer
-  participant Git as GitHub (main)
-  participant CI as Actions: ci
-  participant STS as AWS STS
-  participant ECR as ECR
-  participant Argo as Argo CD (EKS)
-  participant K as Kyverno
-  participant EKS as demo-ENV
-  Dev->>Git: merge change
-  Git->>CI: trigger
-  CI->>CI: tests · govulncheck · Semgrep · build · Trivy
-  CI->>STS: OIDC token → ci-ecr-push role (15 min)
-  CI->>ECR: push digest (immutable tag sha-xxxx)
-  CI->>CI: Syft SBOM · Cosign keyless sign + attest
-  CI->>Git: pin digest in gitops/environments/dev
-  Argo->>Git: poll / webhook
-  Argo->>EKS: sync
-  EKS->>K: admission: registry = ECR, signature from ci.yaml@main, limits, labels
-  K-->>EKS: allow (or deny unsigned / foreign image)
-  Argo->>EKS: PostSync smoke Job
-  Note over Dev,EKS: staging/prod: promotion PR copies digests, production environment approval, manual prod sync
-```
+<a href="images/aws/aws-cicd-gitops.png"><img src="images/aws/aws-cicd-gitops.png" alt="Delivery: CI to ECR, digest pin in Git, Argo CD sync, Kyverno admission" width="100%"></a>
 
 ## 5. Secrets and keys
 
-```mermaid
-flowchart LR
-  TF["Terraform<br/>creates secret containers + KMS keys<br/>(never values)"] --> SMS[("Secrets Manager<br/>dev/demo/backend")]
-  ROT["Rotation Lambda / RDS managed rotation"] --> SMS
-  KMSK["KMS CMK secrets-dev<br/>key policy: admin = tf-apply · use = eso-dev"] -. "encrypts" .-> SMS
-  ESO["ESO (Pod Identity role eso-dev)"] -- "GetSecretValue" --> SMS
-  ESO --> KS[("Kubernetes Secret<br/>envelope-encrypted with KMS eks-secrets")]
-  KS --> POD["demo-backend (volume mount)"]
-  CT["CloudTrail"] -. "GetSecretValue / Decrypt events" .-> AL["EventBridge alarm<br/>unexpected principal · key disable/deletion"]
-```
+<a href="images/aws/aws-secrets.png"><img src="images/aws/aws-secrets.png" alt="Secrets Manager, KMS keys, External Secrets, CloudTrail alarm" width="100%"></a>
 
 The same `ExternalSecret` manifests as locally. Only the `SecretStore` provider changes:
 `aws: {service: SecretsManager, region: us-east-1}` with no static credentials, since Pod Identity supplies them.
 
 ## 6. Terraform layout and ownership
 
-```mermaid
-flowchart TB
-  subgraph TFREPO["terraform/"]
-    MODS["modules/<br/>network · eks · iam-github-oidc · iam-access · ecr · kms · secrets · observability · addons"]
-    ENVS["environments/dev · environments/staging<br/>(composition + tfvars, no secrets)"]
-  end
-  STATE[("S3 state bucket per account<br/>versioning · SSE-KMS · use_lockfile")]
-  PR["Pull request"] --> PLAN["terraform-plan workflow<br/>role tf-plan (read-only)<br/>plan posted to PR"]
-  PLAN --> REVIEW["Human review of the plan"]
-  REVIEW --> APPLY["terraform-apply workflow<br/>environment approval → role tf-apply<br/>applies the reviewed plan file"]
-  APPLY --> STATE
-  ENVS --> MODS
-  APPLY --> AWSRES["AWS: VPC · EKS · node groups · add-ons · IAM · KMS · ECR · Secrets Manager containers · CloudWatch · Argo CD bootstrap"]
-  AWSRES --> ARGOHAND["Argo CD takes over all Kubernetes config<br/>(namespaces, RBAC, policies, apps)"]
-```
+<a href="images/aws/aws-terraform.png"><img src="images/aws/aws-terraform.png" alt="Terraform plan, review, approval and apply with S3 state" width="100%"></a>
 
 | Owner | Resources | Never owns |
 |---|---|---|
