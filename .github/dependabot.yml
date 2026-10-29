@@ -1,0 +1,15 @@
+# Weekly dependency updates as PRs (each runs ci/validate): pinned Action SHAs,
+# Docker base images, Go modules.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    groups:
+      actions: {patterns: ["*"]}
+  - package-ecosystem: docker
+    directories: ["/applications/demo-backend", "/applications/demo-frontend"]
+    schedule: {interval: weekly}
+  - package-ecosystem: gomod
+    directories: ["/applications/demo-backend", "/applications/demo-frontend"]
+    schedule: {interval: weekly}

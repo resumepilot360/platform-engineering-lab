@@ -1,0 +1,16 @@
+# Accepted Trivy misconfiguration findings. Each entry is scoped to one
+# rendered file (see .github/workflows/validate.yaml) and carries a reason.
+# Review on every change to platform/rbac.
+misconfigurations:
+  - id: KSV-0053
+    paths: ["platform_rbac.yaml"]
+    statement: >-
+      Role demo-dev/app-developer grants pods/exec in the dev namespace only, for
+      debugging (Phase 2 design). Not granted in staging or prod; exec is audited
+      at Metadata level in the API audit log.
+  - id: KSV-0056
+    paths: ["platform_rbac.yaml"]
+    statement: >-
+      Role demo-dev/app-developer may manage Services and Ingresses in dev only
+      (self-service). NetworkPolicies are read-only for developers; staging/prod
+      changes go through GitOps only.

@@ -68,7 +68,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: write             # used only on main, for the GHCR push
+      packages: write             # used only on main: GHCR push + signatures
+      id-token: write             # used only on main: Cosign keyless (GitHub OIDC → Fulcio)
     strategy:
       matrix:
         app: [demo-backend, demo-frontend]
@@ -145,6 +146,33 @@ jobs:
           exit-code: "1"
           format: table
 
+      # Supply chain (main only): SBOM + keyless signature + signed SBOM attestation.
+      # Identity = this workflow on main; no signing key exists anywhere.
+      # Legacy .sig/.att format for compatibility with Kyverno verifyImages.
+      - name: Install Cosign
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
+      - name: SBOM (Syft, CycloneDX)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.publish.outputs.digest }}
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Sign image and attest SBOM (Cosign keyless)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          REF: ${{ env.IMAGE }}@${{ steps.publish.outputs.digest }}
+          COSIGN_FLAGS: --yes --new-bundle-format=false --use-signing-config=false
+        run: |
+          cosign sign $COSIGN_FLAGS "$REF"
+          cosign attest $COSIGN_FLAGS --type cyclonedx --predicate sbom.cdx.json "$REF"
+          echo "signed + attested: $REF" >> "$GITHUB_STEP_SUMMARY"
+
   deploy-dev:
     name: pin digests in dev
     needs: build
@@ -157,6 +185,9 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
       - name: Resolve pushed digests and update the dev overlay
         run: |
           short="${GITHUB_SHA::7}"
@@ -164,6 +195,15 @@ jobs:
             ref="$IMAGE_PREFIX/$app:sha-$short"
             digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r .digest)
             [[ "$digest" == sha256:* ]] || { echo "no digest for $ref"; exit 1; }
+            # Refuse to deploy anything this workflow on main did not sign.
+            ident="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/ci.yaml@refs/heads/main"
+            cosign verify --certificate-identity "$ident" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$IMAGE_PREFIX/$app@$digest" >/dev/null
+            cosign verify-attestation --type cyclonedx --certificate-identity "$ident" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$IMAGE_PREFIX/$app@$digest" >/dev/null
+            echo "verified signature + SBOM attestation for $app@$digest"
             echo "$app -> $IMAGE_PREFIX/$app@$digest"
             yq -i "(.images[] | select(.name == \"$app\")) = {\"name\": \"$app\", \"newName\": \"$IMAGE_PREFIX/$app\", \"digest\": \"$digest\"}" \
               gitops/environments/dev/kustomization.yaml
