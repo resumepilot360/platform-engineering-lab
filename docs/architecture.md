@@ -6,68 +6,14 @@ in [`local/versions.env`](../local/versions.env). Every endpoint is linked from
 the lab portal, **http://lab.localhost:8081**. The AWS/EKS target design is in
 [aws-architecture.md](aws-architecture.md).
 
+Diagrams are generated from code ([`docs/diagrams/local_architecture.py`](diagrams/local_architecture.py)).
+Click a diagram for full resolution. Tools without an icon in the diagram
+library (Cilium, OpenBao, k3d) use the Kubernetes icon for what they run as,
+with the tool named in the label.
+
 ## 1. Components
 
-```mermaid
-flowchart LR
-  subgraph GH["GitHub (public): resumepilot360/platform-engineering-lab"]
-    direction TB
-    REPO[("Git repo, main<br/>source of truth")]
-    ACT["GitHub Actions<br/>ci · promote · validate"]
-    GHCR[("GHCR<br/>demo-backend / demo-frontend<br/>amd64 + arm64, by digest")]
-    ENV["Environments<br/>staging · production (required reviewer)"]
-  end
-
-  subgraph HOST["macOS host (Apple Silicon) · Docker Desktop 6 vCPU / 15 GiB"]
-    direction TB
-    USER(["You: browser · kubectl · k9s · gh"])
-    subgraph REG["Registries (outside cluster lifecycle)"]
-      LREG[("k3d-registry.localhost:5001<br/>approved local images")]
-      MIR[("Pull-through caches<br/>quay.io :5011 · Docker Hub :5012 · ghcr.io :5013")]
-    end
-    LB["k3d serverlb<br/>127.0.0.1:6550 → API<br/>127.0.0.1:8081/8443 → Traefik NodePort"]
-
-    subgraph K3D["k3d cluster: platform-lab · K3s v1.35.5 · 1 server + 2 agents · SQLite · secretbox encryption at rest · audit log"]
-      direction TB
-      subgraph KS["kube-system"]
-        CIL["Cilium 1.20 CNI<br/>+ Hubble relay"]
-        TRA["Traefik Ingress<br/>NodePort 30080/30443"]
-        SYS["CoreDNS · metrics-server<br/>local-path storage"]
-      end
-      subgraph ARGO["argocd"]
-        ACD["Argo CD 3.5<br/>app-of-apps · projects: platform, demo"]
-      end
-      subgraph SEC["Secrets"]
-        BAO["openbao: OpenBao 2.7<br/>raft · Shamir 3/2 · audit"]
-        ESO["external-secrets: ESO 2.14"]
-      end
-      subgraph APPS["demo-dev · demo-staging · demo-prod"]
-        FE["demo-frontend"] --> BE["demo-backend"]
-        SS["SecretStore + ExternalSecret"] --> K8SSEC[("Secret demo-backend-db")]
-        K8SSEC -. volume .-> BE
-      end
-      PORTAL["lab-portal<br/>lab.localhost"]
-    end
-  end
-
-  USER --> LB
-  LB --> TRA
-  TRA --> FE
-  TRA --> PORTAL
-  TRA --> ACD
-  REPO -- "poll every 60s" --> ACD
-  ACD -- "sync" --> APPS
-  ACD -- "sync" --> PORTAL
-  ACT -- "push image" --> GHCR
-  ACT -- "bot commit: dev digests" --> REPO
-  ACT -. "promotion PR" .-> REPO
-  ENV -. "gates prod promotion" .-> ACT
-  GHCR -- "pull via cache" --> MIR
-  MIR --> K3D
-  LREG --> K3D
-  ESO -- "Kubernetes auth (audience openbao)" --> BAO
-  ESO --> SS
-```
+<p align="center"><a href="images/local/local-components.png"><img src="images/local/local-components.png" alt="Local lab components: GitHub, macOS host, registries, k3d cluster with kube-system, platform and demo namespaces" width="70%"></a></p>
 
 | Layer | Tool | Why (decision record) |
 |---|---|---|
@@ -83,86 +29,15 @@ flowchart LR
 
 ## 2. GitOps flow: commit to prod, and rollback
 
-```mermaid
-sequenceDiagram
-  autonumber
-  actor Dev as Developer
-  participant Git as GitHub repo (main)
-  participant CI as Actions: ci
-  participant Reg as GHCR
-  participant Argo as Argo CD
-  participant D as demo-dev
-  participant S as demo-staging
-  participant P as demo-prod
-  actor Rev as Reviewer (production env)
-
-  Dev->>Git: merge change under applications/
-  Git->>CI: push trigger
-  CI->>CI: go vet · unit + integration tests · govulncheck · Semgrep
-  CI->>CI: build amd64 candidate · Trivy gate 1 (fixable HIGH/CRITICAL)
-  CI->>Reg: push sha-xxxx (amd64 + arm64)
-  CI->>CI: Trivy gate 2 on the published arm64 digest
-  CI->>Git: bot commit, pin digests in gitops/environments/dev
-  Argo->>Git: poll (60s)
-  Argo->>D: auto-sync (prune, self-heal)
-  Argo->>D: PostSync smoke Job: frontend → backend → secret
-  Note over D: smoke fails → sync Failed → git revert the deploy commit (≈12s rollback)
-  Dev->>CI: gh workflow run promote -f to=staging
-  CI->>Git: PR copies dev digests → staging (no rebuild)
-  Dev->>Git: review + merge PR
-  Argo->>S: auto-sync + smoke Job
-  Dev->>CI: gh workflow run promote -f to=prod
-  CI-->>Rev: waiting for production environment approval
-  Rev->>CI: approve
-  CI->>Git: PR copies staging digests → prod
-  Rev->>Git: review + merge PR
-  Note over Argo,P: prod is manual sync: OutOfSync until a human syncs
-  Rev->>Argo: Sync demo-prod
-  Argo->>P: sync + smoke Job
-  Note over P: drift in prod is detected (OutOfSync), never auto-reverted
-```
+<p align="center"><a href="images/local/local-gitops-flow.png"><img src="images/local/local-gitops-flow.png" alt="Delivery flow: merge, CI, GHCR, digest pin, Argo CD sync to dev, staging and prod, PostSync smoke test, rollback" width="100%"></a></p>
 
 ## 3. Secrets flow
 
-```mermaid
-flowchart LR
-  OP["Operator<br/>rotate-secret.sh<br/>(scoped token, CAS write)"] -- "HTTP API via port-forward<br/>(no secrets in exec args)" --> KV
-  subgraph BAO["OpenBao (namespace openbao)"]
-    KV[("kv-dev / kv-staging / kv-prod<br/>KV v2, versioned")]
-    POL["policy demo-ENV-read<br/>read kv-ENV/data/demo/*"]
-    ROLE["role eso-demo-ENV<br/>SA eso-reader · ns demo-ENV · aud openbao · 15m TTL"]
-    AUD["audit device: stdout<br/>values HMAC'd"]
-  end
-  subgraph NS["namespace demo-ENV"]
-    SA["SA eso-reader<br/>(no K8s permissions)"]
-    SS["SecretStore openbao"]
-    XS["ExternalSecret demo-backend-db<br/>refresh 1m"]
-    S[("Secret demo-backend-db<br/>encrypted at rest: secretbox")]
-    POD["demo-backend pod<br/>read-only volume, 0400"]
-  end
-  ESO["ESO controller"] -- "TokenRequest (aud openbao)" --> SA
-  ESO -- "login" --> ROLE
-  ROLE --> POL --> KV
-  SS --> ESO
-  XS --> ESO
-  ESO -- "write" --> S
-  S --> POD
-```
+<p align="center"><a href="images/local/local-secrets.png"><img src="images/local/local-secrets.png" alt="Secrets flow: OpenBao, External Secrets, eso-reader ServiceAccount, Secret, demo-backend, encryption at rest" width="70%"></a></p>
 
 ## 4. Ownership layers (no resource has two owners)
 
-```mermaid
-flowchart TB
-  TF["Terraform (Phase 8 / AWS)<br/>VPC · EKS · IAM · KMS · ECR · Secrets Manager"]
-  BOOT["Bootstrap: scripts/cluster-up.sh<br/>k3d cluster · Cilium · bootstrap namespaces<br/>ESO + OpenBao Helm · OpenBao init/unseal · Argo CD + root app"]
-  subgraph ARGOOWN["Argo CD (from Git)"]
-    PLAT["project platform<br/>namespaces · RBAC · secret stores · portal"]
-    DEMO["project demo<br/>workloads only in demo-*<br/>no Secrets, Roles, quotas, NetworkPolicies"]
-  end
-  CIOWN["GitHub Actions<br/>images in GHCR · dev digest pins · promotion PRs"]
-  TF -.-> BOOT --> ARGOOWN
-  CIOWN --> DEMO
-```
+<p align="center"><a href="images/local/local-ownership.png"><img src="images/local/local-ownership.png" alt="Ownership: Terraform on AWS, bootstrap script, Argo CD projects platform and demo, GitHub Actions" width="50%"></a></p>
 
 ## 5. Local vs AWS (target for Phase 8)
 
