@@ -18,6 +18,7 @@ spec:
     - {group: rbac.authorization.k8s.io, kind: ClusterRole}
     - {group: rbac.authorization.k8s.io, kind: ClusterRoleBinding}
     - {group: kyverno.io, kind: ClusterPolicy}
+    - {group: policies.kyverno.io, kind: ImageValidatingPolicy}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

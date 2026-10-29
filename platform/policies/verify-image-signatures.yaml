@@ -1,5 +1,6 @@
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+# Rollout: validationActions [Audit] first; [Deny] after reports are clean.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
 metadata:
   name: verify-image-signatures
   annotations:
@@ -7,39 +8,43 @@ metadata:
     policies.kyverno.io/category: Supply Chain
     policies.kyverno.io/severity: critical
     policies.kyverno.io/description: >-
-      Images from ghcr.io/resumepilot360 must be signed (Cosign keyless) by this repository's ci.yaml on main and carry a signed CycloneDX SBOM attestation.
+      Images from ghcr.io/resumepilot360 must be signed (Cosign keyless) by this
+      repository's ci.yaml on main and carry a signed CycloneDX SBOM attestation.
+      ImageValidatingPolicy (sigstore-go, current trusted root) replaces the
+      ClusterPolicy verifyImages rule, whose legacy verifier rejected current
+      Fulcio certificates ("x509: certificate signed by unknown authority").
 spec:
-  background: true
-  webhookTimeoutSeconds: 30
-  rules:
-    - name: signed-by-ci-on-main
-      match:
-        any:
-          - resources: {kinds: [Pod], namespaces: [demo-dev, demo-staging, demo-prod]}
-      verifyImages:
-        - imageReferences: ["ghcr.io/resumepilot360/*"]
-          failureAction: Audit
-          mutateDigest: false        # digests are already pinned in Git
-          verifyDigest: true
-          required: true
-          attestors:
-            - entries:
-                - keyless:
-                    issuer: https://token.actions.githubusercontent.com
-                    subject: https://github.com/resumepilot360/platform-engineering-lab/.github/workflows/ci.yaml@refs/heads/main
-                    rekor:
-                      url: https://rekor.sigstore.dev
-          attestations:
-            - type: https://cyclonedx.org/bom
-              attestors:
-                - entries:
-                    - keyless:
-                        issuer: https://token.actions.githubusercontent.com
-                        subject: https://github.com/resumepilot360/platform-engineering-lab/.github/workflows/ci.yaml@refs/heads/main
-                        rekor:
-                          url: https://rekor.sigstore.dev
-              conditions:
-                - all:
-                    - key: "{{ bomFormat }}"
-                      operator: Equals
-                      value: CycloneDX
+  validationActions: [Audit]
+  evaluation:
+    background: {enabled: true}
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - {key: kubernetes.io/metadata.name, operator: In, values: [demo-dev, demo-staging, demo-prod]}
+  matchImageReferences:
+    - glob: "ghcr.io/resumepilot360/*"
+  attestors:
+    - name: ci
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              subject: https://github.com/resumepilot360/platform-engineering-lab/.github/workflows/ci.yaml@refs/heads/main
+        ctlog:
+          url: https://rekor.sigstore.dev
+  attestations:
+    - name: sbom
+      intoto:
+        type: https://cyclonedx.org/bom
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.ci])).all(e, e > 0)
+      message: image is not signed by ci.yaml on main
+    - expression: >-
+        images.containers.map(image, verifyAttestationSignatures(image, attestations.sbom, [attestors.ci])).all(e, e > 0)
+      message: image has no CycloneDX SBOM attestation signed by ci.yaml on main
