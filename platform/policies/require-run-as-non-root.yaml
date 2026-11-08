@@ -19,7 +19,7 @@ spec:
         any:
           - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "Set runAsNonRoot: true (pod or every container) and never runAsUser: 0."
         anyPattern:
           - spec:

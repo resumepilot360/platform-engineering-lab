@@ -16,7 +16,7 @@ spec:
         any:
           - resources: {kinds: [Pod], namespaces: [demo-dev, demo-staging, demo-prod]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "Every container needs resources.requests.cpu, resources.requests.memory and resources.limits.memory."
         pattern:
           spec:
