@@ -16,7 +16,7 @@ spec:
         any:
           - resources: {kinds: [Pod], namespaces: [demo-dev, demo-staging, demo-prod]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "Pods need labels app.kubernetes.io/name and app.kubernetes.io/part-of."
         pattern:
           metadata:
@@ -32,7 +32,7 @@ spec:
           # System namespaces created by Kubernetes/K3s and by Cilium itself.
           - resources: {names: [default, kube-system, kube-public, kube-node-lease, cilium-secrets]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "Namespaces need the label lab.platform/environment."
         pattern:
           metadata:

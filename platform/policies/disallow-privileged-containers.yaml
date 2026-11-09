@@ -19,7 +19,7 @@ spec:
         any:
           - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "Privileged containers are not allowed (securityContext.privileged must be false or unset)."
         pattern:
           spec:

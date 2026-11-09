@@ -14,7 +14,7 @@ metadata:
       ClusterPolicy verifyImages rule, whose legacy verifier rejected current
       Fulcio certificates ("x509: certificate signed by unknown authority").
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
   evaluation:
     background: {enabled: true}
   matchConstraints:

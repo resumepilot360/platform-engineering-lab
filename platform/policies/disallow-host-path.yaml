@@ -19,7 +19,7 @@ spec:
         any:
           - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "hostPath volumes are not allowed."
         pattern:
           spec:

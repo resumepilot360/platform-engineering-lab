@@ -19,7 +19,7 @@ spec:
         any:
           - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "hostNetwork, hostPID and hostIPC must be false or unset."
         pattern:
           spec:
@@ -34,7 +34,7 @@ spec:
         any:
           - resources: {namespaces: [kube-system, kube-public, kube-node-lease, kyverno, falco]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "hostPort is not allowed."
         pattern:
           spec:

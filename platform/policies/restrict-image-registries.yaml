@@ -16,7 +16,7 @@ spec:
         any:
           - resources: {kinds: [Pod], namespaces: [demo-dev, demo-staging, demo-prod, lab-smoke, lab-portal]}
       validate:
-        failureAction: Audit
+        failureAction: Enforce
         message: "Image {{ request.object.spec.containers[0].image }} is not from an approved registry (ghcr.io/resumepilot360/* or k3d-registry.localhost:5001/*)."
         pattern:
           spec:
