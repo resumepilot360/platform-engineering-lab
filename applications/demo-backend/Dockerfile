@@ -2,7 +2,7 @@
 # Build: static, reproducible-ish binary (no cgo, trimmed paths, no VCS stamping).
 # Build stage runs natively on the builder and cross-compiles for each target
 # platform (no QEMU emulation needed).
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build
 WORKDIR /src
 COPY go.mod ./
 RUN go mod download
